@@ -1,68 +1,162 @@
-'use client';
-import { motion } from 'framer-motion';
-import { ArrowRight, FileSearch } from 'lucide-react';
-import { RoutingLedger } from '@/components/ui/RoutingLedger';
+"use client";
 
-export function Hero() {
+import { motion } from "motion/react";
+import { ArrowRight, ChevronRight } from "lucide-react";
+
+import { Brain } from "@phosphor-icons/react";
+
+import RoutingEngine from "./RoutingEngine";
+
+export default function Hero() {
   return (
-    <section className="relative overflow-hidden px-4 pb-24 pt-40 sm:pt-48">
-      <div className="pointer-events-none absolute inset-0 bg-grain opacity-40" />
-      <div className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[720px] -translate-x-1/2 rounded-full bg-gold/10 blur-[140px] animate-pulseGlow" />
+    <section
+      id="top"
+      className="attentra-atmosphere attendra-atmosphere-strong relative isolate overflow-hidden bg-[var(--color-background)] pt-36 sm:pt-40 lg:pt-44"
+    >
+      {/* =====================================================
+          BACKGROUND ATMOSPHERE
+          ===================================================== */}
 
-      <div className="relative z-10 mx-auto grid max-w-6xl gap-16 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <span className="inline-flex items-center gap-2 rounded-full border border-paper-lineStrong bg-paper-raised px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-gold">
-            <FileSearch className="h-3.5 w-3.5" />
-            Every decision, logged
-          </span>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        {/* Main blue atmospheric glow */}
+        <div className="absolute left-1/2 top-[-24rem] h-[48rem] w-[48rem] -translate-x-1/2 rounded-full bg-[var(--color-accent-soft)] opacity-70 blur-[120px]" />
 
-          <h1 className="mt-6 font-display text-[2.75rem] font-semibold leading-[1.08] tracking-tight text-ink sm:text-6xl">
-            Stop guessing which
+        {/* Left soft light */}
+        <div className="absolute left-[5%] top-[25%] h-64 w-64 rounded-full bg-white opacity-80 blur-[100px]" />
+
+        {/* Right soft blue light */}
+        <div className="absolute right-[5%] top-[45%] h-72 w-72 rounded-full bg-[var(--color-accent-soft)] opacity-30 blur-[120px]" />
+      </div>
+
+      <div className="attentra-container relative">
+        {/* =====================================================
+            HERO COPY
+            ===================================================== */}
+
+        <div className="mx-auto max-w-5xl text-center">
+          {/* Eyebrow */}
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.7,
+              delay: 0.1,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="mb-6 flex items-center justify-center gap-2"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
+              <motion.div
+                animate={{
+                  rotate: [0, -3, 3, 0],
+                  scale: [1, 1.04, 1.04, 1],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Brain size={18} weight="duotone" />
+              </motion.div>
+            </span>
+
+            <span className="attentra-label text-[var(--color-accent)]">
+              Intelligent LLM Routing
+            </span>
+          </motion.div>
+
+          {/* Main headline */}
+
+          <motion.h1
+            initial={{ opacity: 0, y: 25 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.8,
+              delay: 0.15,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="font-reservation uppercase text-5xl font-semibold leading-[0.98] tracking-[-0.045em] text-[var(--color-foreground)] sm:text-6xl lg:text-7xl xl:text-[5.5rem]"
+          >
+            Your AI doesn't need
             <br />
-            model your AI calls need.
-          </h1>
+            <span className="text-[var(--color-accent)]">one model.</span>
+          </motion.h1>
 
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-dim">
-            Attentra sits between your app and every LLM provider. It scores each request in
-            under 5ms, routes it to the cheapest model that can still do the job well, and keeps
-            a full, exportable record of why — so cost cuts never come at the price of trust.
-          </p>
+          {/* Description */}
 
-          <div className="mt-9 flex flex-wrap items-center gap-4">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.7,
+              delay: 0.35,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="attentra-body mx-auto mt-7 max-w-2xl text-lg sm:text-xl"
+          >
+            Attentra automatically routes every AI request to the model that
+            best fits its complexity, quality requirements, latency, and cost.
+          </motion.p>
+
+          {/* =====================================================
+              CTA
+              ===================================================== */}
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.7,
+              delay: 0.5,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          >
+            {/* Primary CTA */}
+
             <a
-              href="#calculator"
-              className="group flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-medium text-paper transition-all hover:bg-gold"
+              href="#product"
+              className="group flex items-center gap-2 rounded-full bg-[var(--color-foreground)] px-6 py-3.5 text-sm font-medium text-white transition-transform duration-200 hover:-translate-y-0.5 hover:bg-[#202320]"
             >
-              See your estimated savings
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              Start routing
+              <ArrowRight
+                size={16}
+                className="transition-transform duration-200 group-hover:translate-x-1"
+              />
             </a>
+
+            {/* Secondary CTA */}
+
             <a
               href="#how-it-works"
-              className="rounded-full border border-paper-lineStrong px-6 py-3 text-ink-dim transition-all hover:border-ink-faint hover:text-ink"
+              className="flex items-center gap-1 rounded-full px-5 py-3.5 text-sm font-medium text-[var(--color-foreground-secondary)] transition-colors hover:text-[var(--color-foreground)]"
             >
-              How routing works
+              See how it works
+              <ChevronRight size={16} />
             </a>
-          </div>
+          </motion.div>
+        </div>
 
-          <div className="mt-12 flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs text-ink-faint">
-            <span>40–60% lower model spend</span>
-            <span className="text-paper-lineStrong">/</span>
-            <span>&lt;5ms routing decision</span>
-            <span className="text-paper-lineStrong">/</span>
-            <span>one API, every provider</span>
-          </div>
-        </motion.div>
+        {/* =====================================================
+            ATTENTRA DECISION ENGINE
+            ===================================================== */}
 
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={{
+            duration: 1,
+            delay: 0.7,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="relative mx-auto mt-20 max-w-6xl pb-20"
         >
-          <RoutingLedger />
+          <RoutingEngine />
         </motion.div>
       </div>
     </section>

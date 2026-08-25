@@ -1,27 +1,415 @@
+@import "../styles/design-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================
+   ATTENTRA — GLOBAL FOUNDATION
+   ========================================================= */
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+  background: var(--color-background);
 }
 
 body {
-  background-color: #08090A;
-  color: #EDEFE7;
+  margin: 0;
+  padding: 0;
   overflow-x: hidden;
+
+  background: var(--color-background);
+  color: var(--color-foreground);
+
+  font-family: var(--font-sans);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
+/* =========================================================
+   SELECTION
+   ========================================================= */
+
+::selection {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-foreground-muted);
+}
+
+/* Firefox */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color:
+    var(--color-border-strong)
+    var(--color-background);
+}
+
+/* =========================================================
+   ATTENTRA — LAYOUT
+   ========================================================= */
+
+.attentra-container {
+  width: min(
+    calc(100% - (var(--container-padding) * 2)),
+    var(--container-width)
+  );
+
+  margin-inline: auto;
+}
+
+.attentra-section {
+  padding-block: clamp(5rem, 10vw, 10rem);
+}
+
+.attentra-section-tight {
+  padding-block: clamp(3rem, 6vw, 6rem);
+}
+
+/* =========================================================
+   ATTENTRA — TYPOGRAPHY
+   ========================================================= */
+
+.attentra-display {
+  font-size: clamp(3.5rem, 7vw, 7rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.attentra-heading {
+  font-size: clamp(2.5rem, 5vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.attentra-subheading {
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.attentra-body {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--color-foreground-secondary);
+}
+
+.attentra-label {
+  font-size: 0.75rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* =========================================================
+   ATTENTRA — UTILITY SURFACES
+   ========================================================= */
+
+.attentra-surface {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.attentra-surface-soft {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+}
+
+/* =========================================================
+   ATTENTRA — LIGHT ATMOSPHERE
+   ========================================================= */
+
+.attentra-atmosphere {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.attentra-atmosphere::before {
+  content: "";
+  position: absolute;
+
+  z-index: -1;
+  pointer-events: none;
+
+  width: 34rem;
+  height: 34rem;
+
+  left: 50%;
+  top: 5%;
+
+  transform: translateX(-50%);
+
+  border-radius: 999px;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(217, 119, 69, 0.14) 0%,
+      rgba(217, 119, 69, 0.07) 32%,
+      rgba(217, 119, 69, 0) 72%
+    );
+
+  filter: blur(35px);
+}
+
+.attentra-atmosphere::after {
+  content: "";
+  position: absolute;
+
+  z-index: -1;
+  pointer-events: none;
+
+  width: 24rem;
+  height: 24rem;
+
+  right: -8rem;
+  bottom: 0;
+
+  border-radius: 999px;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(217, 119, 69, 0.08) 0%,
+      rgba(217, 119, 69, 0) 70%
+    );
+
+  filter: blur(45px);
+}
+
+/* Strong atmospheric sections */
+
+.attentra-atmosphere-strong::before {
+  width: 42rem;
+  height: 42rem;
+
+  top: -8rem;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(217, 119, 69, 0.18) 0%,
+      rgba(217, 119, 69, 0.08) 32%,
+      rgba(217, 119, 69, 0) 72%
+    );
+
+  filter: blur(45px);
+}
+
+/* Subtle atmospheric sections */
+
+.attentra-atmosphere-subtle::before {
+  opacity: 0.45;
+}
+
+/* =========================================================
+   ATTENTRA — DARK SECTIONS
+   ========================================================= */
+
+.attentra-dark {
+  position: relative;
+  isolation: isolate;
+
+  background: var(--color-dark);
+  color: #ffffff;
+}
+
+.attentra-dark-atmosphere {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+
+  background: var(--color-dark);
+  color: #ffffff;
+}
+
+.attentra-dark-atmosphere::before {
+  content: "";
+  position: absolute;
+
+  z-index: -1;
+  pointer-events: none;
+
+  width: 42rem;
+  height: 42rem;
+
+  top: -18rem;
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  border-radius: 999px;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(217, 119, 69, 0.16) 0%,
+      rgba(217, 119, 69, 0.07) 32%,
+      rgba(217, 119, 69, 0) 72%
+    );
+
+  filter: blur(50px);
+}
+
+.attentra-dark-atmosphere::after {
+  content: "";
+  position: absolute;
+
+  z-index: -1;
+  pointer-events: none;
+
+  width: 28rem;
+  height: 28rem;
+
+  right: -12rem;
+  bottom: -12rem;
+
+  border-radius: 999px;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(217, 119, 69, 0.09) 0%,
+      rgba(217, 119, 69, 0) 70%
+    );
+
+  filter: blur(55px);
+}
+
+/* =========================================================
+   ATTENTRA — DARK SURFACES
+   ========================================================= */
+
+.attentra-dark-surface {
+  background: var(--color-dark-soft);
+  border: 1px solid var(--color-dark-border);
+}
+
+.attentra-dark-border {
+  border-color: var(--color-dark-border);
+}
+
+/* =========================================================
+   ATTENTRA — DARK TYPOGRAPHY
+   ========================================================= */
+
+.attentra-dark .attentra-heading,
+.attentra-dark .attentra-subheading,
+.attentra-dark .attentra-display,
+.attentra-dark-atmosphere .attentra-heading,
+.attentra-dark-atmosphere .attentra-subheading,
+.attentra-dark-atmosphere .attentra-display {
+  color: #ffffff;
+}
+
+.attentra-dark .attentra-body,
+.attentra-dark-atmosphere .attentra-body {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.attentra-dark .attentra-label,
+.attentra-dark-atmosphere .attentra-label {
+  color: var(--color-accent);
+}
+
+/* =========================================================
+   ATTENTRA — COPPER UTILITIES
+   ========================================================= */
+
+.attentra-accent {
+  color: var(--color-accent);
+}
+
+.attentra-accent-bg {
+  background: var(--color-accent);
+}
+
+.attentra-accent-soft {
+  background: var(--color-accent-soft);
+}
+
+.attentra-accent-border {
+  border-color: var(--color-accent);
+}
+
+/* =========================================================
+   ATTENTRA — GLOW UTILITIES
+   ========================================================= */
+
+.attentra-glow {
+  box-shadow:
+    0 0 0 1px rgba(217, 119, 69, 0.08),
+    0 20px 60px rgba(217, 119, 69, 0.12);
+}
+
+.attentra-glow-strong {
+  box-shadow:
+    0 0 0 1px rgba(217, 119, 69, 0.12),
+    0 20px 80px rgba(217, 119, 69, 0.18);
+}
+
+/* =========================================================
+   ATTENTRA — GRAIN
+   ========================================================= */
+
+.bg-grain {
+  background-image:
+    radial-gradient(
+      circle at 1px 1px,
+      rgba(25, 23, 21, 0.035) 1px,
+      transparent 0
+    );
+
+  background-size: 22px 22px;
+}
+
+/* =========================================================
+   ATTENTRA — MOTION / ACCESSIBILITY
+   ========================================================= */
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -29,30 +417,88 @@ body {
   }
 }
 
-::selection {
-  background: #D8A94A;
-  color: #08090A;
+/* =========================================================
+   ATTENTRA — RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 640px) {
+  :root {
+    --container-padding: 1rem;
+  }
+
+  .attentra-display {
+    font-size: clamp(3rem, 14vw, 4.5rem);
+    letter-spacing: -0.06em;
+  }
+
+  .attentra-heading {
+    font-size: clamp(2.5rem, 11vw, 4rem);
+  }
+
+  .attentra-body {
+    font-size: 1rem;
+  }
+
+  .attentra-atmosphere::before {
+    width: 24rem;
+    height: 24rem;
+  }
+
+  .attentra-atmosphere::after {
+    width: 18rem;
+    height: 18rem;
+  }
+
+  .attentra-dark-atmosphere::before {
+    width: 28rem;
+    height: 28rem;
+  }
+
+  .attentra-dark-atmosphere::after {
+    width: 18rem;
+    height: 18rem;
+  }
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #08090A;
-}
-::-webkit-scrollbar-thumb {
-  background: #23261F;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #33372B;
-}
+/* =========================================================
+   LEGACY COMPATIBILITY
+   ========================================================= */
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-.bg-grain {
-  background-image: radial-gradient(circle at 1px 1px, rgba(237,239,231,0.05) 1px, transparent 0);
-  background-size: 22px 22px;
+/* =========================================================
+   MOBILE SCROLL HELPERS
+   ========================================================= */
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* =========================================================
+   GLOBAL OVERFLOW PROTECTION
+   ========================================================= */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@font-face {
+  font-family: "Reservation Wide";
+  src: url("/fonts/ReservationWide-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-reservation: "Reservation Wide", sans-serif;
 }
