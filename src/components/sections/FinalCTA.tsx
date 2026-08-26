@@ -3,11 +3,11 @@
 import { motion } from "motion/react";
 import {
   ArrowRight,
-  Check,
-  Code2,
+  CheckCircle,
+  Code,
   GitBranch,
-  Sparkles,
-} from "lucide-react";
+  Sparkle,
+} from "@phosphor-icons/react";
 
 export default function FinalCTA() {
   return (
@@ -67,7 +67,7 @@ export default function FinalCTA() {
             className="flex items-center justify-center gap-2"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-              <Sparkles size={14} />
+              <Sparkle size={14} />
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
@@ -208,13 +208,13 @@ export default function FinalCTA() {
           />
 
           <Principle
-            icon={<Code2 size={15} />}
+            icon={<Code size={15} />}
             title="API first"
             description="Designed to fit into the stack you're already building."
           />
 
           <Principle
-            icon={<Check size={15} />}
+            icon={<CheckCircle size={15} />}
             title="Cost aware"
             description="Use expensive capability when the request actually needs it."
           />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight, List, X } from "@phosphor-icons/react";
 import Image from "next/image";
 const navItems = [
   { label: "Product", href: "#product" },
@@ -87,7 +87,7 @@ export default function Navbar() {
             aria-label="Attentra home"
           >
             <Image
-              src="/attentra.png"
+              src="/Attentra.png"
               alt="Attentra Logo"
               width={120}
               height={32}
@@ -149,7 +149,7 @@ export default function Navbar() {
             aria-expanded={mobileOpen}
             aria-controls="mobile-navigation"
           >
-            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            {mobileOpen ? <X size={18} /> : <List size={18} />}
           </button>
         </motion.div>
       </motion.header>

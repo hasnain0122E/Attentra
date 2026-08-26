@@ -23,7 +23,7 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'Attentra — The routing ledger for enterprise AI spend',
   description:
-    'Attentra scores every LLM request in real time and routes it to the cheapest model that can still do the job — with a full, auditable log of every decision. Cut AI infrastructure costs 40–60% without touching output quality.',
+    'Attentra is an intelligent AI routing platform that evaluates every request and routes it to the best-fit model based on task requirements, capability, cost and latency — with full, auditable cost and savings intelligence. Cut AI infrastructure costs significantly without sacrificing output quality.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

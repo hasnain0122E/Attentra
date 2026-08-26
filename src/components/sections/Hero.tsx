@@ -1,9 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, ChevronRight } from "lucide-react";
-
-import { Brain } from "@phosphor-icons/react";
+import { ArrowRight, CaretRight, Brain } from "@phosphor-icons/react";
 
 import RoutingEngine from "./RoutingEngine";
 
@@ -137,7 +135,7 @@ export default function Hero() {
               className="flex items-center gap-1 rounded-full px-5 py-3.5 text-sm font-medium text-[var(--color-foreground-secondary)] transition-colors hover:text-[var(--color-foreground)]"
             >
               See how it works
-              <ChevronRight size={16} />
+              <CaretRight size={16} />
             </a>
           </motion.div>
         </div>

@@ -3,17 +3,13 @@
 import { motion } from "motion/react";
 import {
   ArrowRight,
-  Check,
-  CircleDollarSign,
-  Gauge,
-  Layers3,
-  Zap,
-} from "lucide-react";
-
-import {
   Brain,
+  CheckCircle,
   Code,
+  CurrencyDollar,
+  Gauge,
   Lightning,
+  Stack,
 } from "@phosphor-icons/react";
 
 const models = [
@@ -81,7 +77,7 @@ export default function ModelFragmentation() {
           >
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-                <Layers3 size={16} />
+                <Stack size={16} />
               </span>
 
               <span className="attentra-label text-[var(--color-accent)]">
@@ -188,7 +184,7 @@ export default function ModelFragmentation() {
 
                 <div className="mt-8 grid grid-cols-2 gap-3">
                   <div className="rounded-xl bg-[var(--color-background)] p-3">
-                    <CircleDollarSign
+                    <CurrencyDollar
                       size={14}
                       className="text-[var(--color-accent)]"
                     />
@@ -243,7 +239,7 @@ export default function ModelFragmentation() {
 
               <div className="mt-3 flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[var(--color-foreground-muted)]">
-                  <Zap size={17} />
+                  <Lightning size={17} />
                 </div>
 
                 <div>
@@ -271,7 +267,7 @@ export default function ModelFragmentation() {
 
               <div className="mt-3 flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent)] text-white">
-                  <Check size={17} />
+                  <CheckCircle size={17} />
                 </div>
 
                 <div>

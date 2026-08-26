@@ -2,18 +2,15 @@
 
 import { motion } from "motion/react";
 import {
-  ArrowRight,
-  Check,
-  CircleDollarSign,
-  Gauge,
-  Sparkles,
-  Zap,
-} from "lucide-react";
-
-import {
   ArrowsClockwise,
+  ArrowRight,
+  CheckCircle,
+  CurrencyDollar,
   Funnel,
+  Gauge,
+  Lightning,
   Scan,
+  Sparkle,
 } from "@phosphor-icons/react";
 
 const stages = [
@@ -383,19 +380,19 @@ export default function HowItWorks() {
                 />
 
                 <DecisionFactor
-                  icon={<CircleDollarSign size={16} />}
+                  icon={<CurrencyDollar size={16} />}
                   label="Cost"
                   description="Avoid paying premium prices for simple work."
                 />
 
                 <DecisionFactor
-                  icon={<Sparkles size={16} />}
+                  icon={<Sparkle size={16} />}
                   label="Quality"
                   description="Use stronger models when complexity demands it."
                 />
 
                 <DecisionFactor
-                  icon={<Zap size={16} />}
+                  icon={<Lightning size={16} />}
                   label="Task fit"
                   description="Match the model to what the request actually needs."
                 />
@@ -405,7 +402,7 @@ export default function HowItWorks() {
 
               <div className="mt-5 flex items-center gap-3 rounded-2xl border border-[var(--color-success)]/20 bg-[var(--color-success-soft)] p-4">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--color-success)]">
-                  <Check size={17} />
+                  <CheckCircle size={17} />
                 </div>
 
                 <div>

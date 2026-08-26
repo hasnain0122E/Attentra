@@ -3,12 +3,12 @@
 import { motion } from "motion/react";
 import {
   ArrowRight,
-  Check,
-  CircleDollarSign,
+  CheckCircle,
+  CurrencyDollar,
   Gauge,
   GitBranch,
-  Sparkles,
-} from "lucide-react";
+  Sparkle,
+} from "@phosphor-icons/react";
 
 const plans = [
   {
@@ -113,7 +113,7 @@ export default function Pricing() {
             className="flex items-center justify-center gap-2"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-              <CircleDollarSign size={14} />
+              <CurrencyDollar size={14} />
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
@@ -206,7 +206,7 @@ export default function Pricing() {
           className="mx-auto mt-8 flex max-w-3xl flex-col items-center justify-center gap-3 text-center sm:flex-row"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-            <Sparkles size={14} />
+            <Sparkle size={14} />
           </div>
 
           <p className="text-xs leading-5 text-[var(--color-foreground-secondary)]">
@@ -250,7 +250,7 @@ export default function Pricing() {
           />
 
           <Value
-            icon={<CircleDollarSign size={15} />}
+            icon={<CurrencyDollar size={15} />}
             title="Cost conscious"
             description="Use premium capability when it actually matters."
           />
@@ -367,7 +367,7 @@ function PricingCard({
                 className="flex min-w-0 items-start gap-2.5"
               >
                 <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-                  <Check size={9} strokeWidth={2.5} />
+                  <CheckCircle size={9} strokeWidth={2.5} />
                 </span>
 
                 <span className="text-xs leading-5 text-[var(--color-foreground-secondary)]">

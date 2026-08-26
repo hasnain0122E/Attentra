@@ -4,17 +4,17 @@ import { useState, type ElementType } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
-  BarChart3,
-  Bot,
-  Code2,
+  Chat,
+  Code,
   Headphones,
-  Layers3,
-  MessageSquare,
-  PenLine,
+  ChartBar,
+  Pen,
+  Robot,
   ShieldCheck,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+  Sparkle,
+  Stack,
+  Lightning,
+} from "@phosphor-icons/react";
 
 type RouteOption = {
   label: string;
@@ -73,7 +73,7 @@ const useCases: UseCase[] = [
     id: "coding",
     label: "Coding & development",
     shortLabel: "Coding",
-    icon: Code2,
+    icon: Code,
     title:
       "Give engineering workloads the model capability they actually need.",
     description:
@@ -103,7 +103,7 @@ const useCases: UseCase[] = [
     id: "content",
     label: "Content & generation",
     shortLabel: "Content",
-    icon: PenLine,
+    icon: Pen,
     title:
       "Balance creative quality with the economics of high-volume generation.",
     description:
@@ -133,7 +133,7 @@ const useCases: UseCase[] = [
     id: "analysis",
     label: "Analysis & reasoning",
     shortLabel: "Analysis",
-    icon: BarChart3,
+    icon: ChartBar,
     title:
       "Reserve expensive reasoning for the requests that actually require it.",
     description:
@@ -201,7 +201,7 @@ export default function UseCases() {
           >
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-                <Layers3 size={14} />
+                <Stack size={14} />
               </span>
 
               <span className="attentra-label text-[var(--color-accent)]">
@@ -354,7 +354,7 @@ export default function UseCases() {
 
                 <div className="mt-8 rounded-2xl border border-[var(--color-border)] bg-white p-5">
                   <div className="flex items-center gap-2">
-                    <MessageSquare
+                    <Chat
                       size={13}
                       className="shrink-0 text-[var(--color-accent)]"
                     />
@@ -388,7 +388,7 @@ export default function UseCases() {
                     </div>
 
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--color-accent)] shadow-sm">
-                      <Bot size={15} />
+                      <Robot size={15} />
                     </div>
                   </div>
 
@@ -420,9 +420,9 @@ export default function UseCases() {
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
                             {index === 0 ? (
-                              <Zap size={16} />
+                              <Lightning size={16} />
                             ) : (
-                              <Sparkles size={16} />
+                              <Sparkle size={16} />
                             )}
                           </div>
 

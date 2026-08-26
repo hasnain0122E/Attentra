@@ -4,12 +4,12 @@ import { motion } from "motion/react";
 import {
   ArrowDownRight,
   ArrowRight,
-  CircleDollarSign,
+  CurrencyDollar,
   Gauge,
-  Layers3,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+  Sparkle,
+  Stack,
+  Lightning,
+} from "@phosphor-icons/react";
 
 const advantages = [
   {
@@ -20,7 +20,7 @@ const advantages = [
       "Not every request needs your most expensive model. Attentra can intelligently favor capable, lower-cost models when the task allows it.",
     metric: "$0.003",
     metricLabel: "example request cost",
-    icon: CircleDollarSign,
+    icon: CurrencyDollar,
   },
   {
     number: "02",
@@ -40,7 +40,7 @@ const advantages = [
       "Simple classification, creative generation, coding, and complex reasoning do not have identical model requirements. Attentra adapts to the request.",
     metric: "96",
     metricLabel: "example quality score",
-    icon: Sparkles,
+    icon: Sparkle,
   },
 ];
 
@@ -77,7 +77,7 @@ export default function WhyAttentra() {
           >
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-                <Layers3 size={14} />
+                <Stack size={14} />
               </span>
 
               <span className="attentra-label text-[var(--color-accent)]">
@@ -149,7 +149,7 @@ export default function WhyAttentra() {
               {/* Application */}
 
               <Node
-                icon={<Zap size={17} />}
+                icon={<Lightning size={17} />}
                 label="Your app"
                 sublabel="One API"
               />
@@ -175,7 +175,7 @@ export default function WhyAttentra() {
                 />
 
                 <div className="relative flex h-16 w-36 items-center justify-center gap-2 rounded-2xl border border-[var(--color-accent)]/30 bg-[var(--color-accent-soft)] text-[var(--color-accent)] shadow-sm">
-                  <Sparkles size={17} />
+                  <Sparkle size={17} />
 
                   <div className="text-left">
                     <div className="text-xs font-semibold">

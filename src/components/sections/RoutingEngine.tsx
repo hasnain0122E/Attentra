@@ -3,12 +3,12 @@
 import { motion } from "motion/react";
 import {
   ArrowDown,
-  Check,
-  CircleDollarSign,
+  CheckCircle,
+  CurrencyDollar,
   Gauge,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+  Sparkle,
+  Lightning,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 const models = [
@@ -195,7 +195,7 @@ export default function RoutingEngine() {
                   }}
                   className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--color-accent)] shadow-[var(--shadow-sm)]"
                 >
-                  <Sparkles size={17} />
+                  <Sparkle size={17} />
                 </motion.div>
               </div>
 
@@ -214,13 +214,13 @@ export default function RoutingEngine() {
                 <DecisionMetric
                   label="Complexity"
                   value="34"
-                  icon={<Sparkles size={13} />}
+                  icon={<Sparkle size={13} />}
                 />
 
                 <DecisionMetric
                   label="Quality"
                   value="88+"
-                  icon={<Check size={13} />}
+                  icon={<CheckCircle size={13} />}
                 />
 
                 <DecisionMetric
@@ -232,7 +232,7 @@ export default function RoutingEngine() {
                 <DecisionMetric
                   label="Cost"
                   value="Min"
-                  icon={<CircleDollarSign size={13} />}
+                  icon={<CurrencyDollar size={13} />}
                 />
               </div>
 
@@ -319,7 +319,7 @@ export default function RoutingEngine() {
                         layoutId="selected-model"
                         className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-[var(--color-accent)] px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-white"
                       >
-                        <Check size={10} />
+                        <CheckCircle size={10} />
                         Best fit
                       </motion.div>
                     )}
@@ -428,7 +428,7 @@ export default function RoutingEngine() {
               className="relative flex w-full max-w-lg items-center gap-4 rounded-2xl border border-[var(--color-success)]/30 bg-[var(--color-success-soft)] p-4 sm:p-5"
             >
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--color-success)] shadow-[var(--shadow-sm)]">
-                <Zap size={19} />
+                <Lightning size={19} />
               </div>
 
               <div className="min-w-0 flex-1">
@@ -489,12 +489,12 @@ export default function RoutingEngine() {
           </span>
 
           <span className="flex items-center gap-1.5">
-            <CircleDollarSign size={12} />
+            <CurrencyDollar size={12} />
             Cost aware
           </span>
 
           <span className="flex items-center gap-1.5">
-            <Sparkles size={12} />
+            <Sparkle size={12} />
             Quality aware
           </span>
         </div>

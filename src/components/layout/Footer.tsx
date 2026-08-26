@@ -3,10 +3,10 @@
 import { motion } from "motion/react";
 import {
   ArrowUpRight,
-  Github,
-  Linkedin,
-  Mail,
-} from "lucide-react";
+  GithubLogo,
+  LinkedinLogo,
+  Envelope,
+} from "@phosphor-icons/react";
 
 const productLinks = [
   {
@@ -119,19 +119,19 @@ export default function Footer() {
               <SocialLink
                 href="https://github.com"
                 label="GitHub"
-                icon={<Github size={14} />}
+                icon={<GithubLogo size={14} />}
               />
 
               <SocialLink
                 href="https://linkedin.com"
                 label="LinkedIn"
-                icon={<Linkedin size={14} />}
+                icon={<LinkedinLogo size={14} />}
               />
 
               <SocialLink
                 href="mailto:hello@attentra.ai"
                 label="Email Attentra"
-                icon={<Mail size={14} />}
+                icon={<Envelope size={14} />}
               />
             </div>
           </motion.div>

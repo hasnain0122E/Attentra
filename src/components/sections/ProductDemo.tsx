@@ -4,15 +4,16 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
-  Check,
-  ChevronDown,
-  CircleDollarSign,
+  CaretDown,
+  CheckCircle,
+  ChartBar,
+  CurrencyDollar,
   Gauge,
   Play,
-  Sparkles,
-  Terminal,
-  Zap,
-} from "lucide-react";
+  Sparkle,
+  TerminalWindow,
+  Lightning,
+} from "@phosphor-icons/react";
 
 const models = [
   {
@@ -200,7 +201,7 @@ export default function ProductDemo() {
             className="flex items-center justify-center gap-2"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-              <Terminal size={14} />
+              <TerminalWindow size={14} />
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
@@ -273,7 +274,7 @@ export default function ProductDemo() {
           <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-white px-5 py-4 sm:px-7">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-foreground)] text-white">
-                <Sparkles size={14} />
+                <Sparkle size={14} />
               </div>
 
               <div>
@@ -445,7 +446,7 @@ export default function ProductDemo() {
                         />
 
                         <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-accent)] text-white shadow-[0_0_30px_rgba(49,92,255,0.25)]">
-                          <Sparkles size={19} />
+                          <Sparkle size={19} />
                         </div>
                       </div>
 
@@ -556,7 +557,7 @@ export default function ProductDemo() {
                           animate={{ scale: 1 }}
                           className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
                         >
-                          <Sparkles size={17} />
+                          <Sparkle size={17} />
                         </motion.div>
 
                         <div>
@@ -571,13 +572,13 @@ export default function ProductDemo() {
                       </div>
 
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-success)]">
-                        <Check size={15} />
+                        <CheckCircle size={15} />
                       </div>
                     </div>
 
                     <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--color-border)] rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
                       <ResultMetric
-                        icon={<Sparkles size={12} />}
+                        icon={<Sparkle size={12} />}
                         label="QUALITY"
                         value={`${currentModel.quality}`}
                       />
@@ -589,7 +590,7 @@ export default function ProductDemo() {
                       />
 
                       <ResultMetric
-                        icon={<CircleDollarSign size={12} />}
+                        icon={<CurrencyDollar size={12} />}
                         label="COST"
                         value={currentModel.cost}
                       />
@@ -631,7 +632,7 @@ export default function ProductDemo() {
 
           <div className="flex flex-col gap-3 border-t border-[var(--color-border)] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
             <div className="flex items-center gap-2">
-              <Zap
+              <Lightning
                 size={12}
                 className="text-[var(--color-accent)]"
               />
@@ -722,7 +723,7 @@ function SelectField({
           ))}
         </select>
 
-        <ChevronDown
+        <CaretDown
           size={12}
           className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[var(--color-foreground-muted)]"
         />
@@ -869,7 +870,7 @@ function ModelRow({
               }}
               className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-success)]"
             >
-              <Check size={13} />
+              <CheckCircle size={13} />
             </motion.div>
           )}
         </AnimatePresence>

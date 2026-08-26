@@ -4,14 +4,14 @@ import { motion } from "motion/react";
 import {
   ArrowDown,
   ArrowRight,
-  Check,
-  CircleDollarSign,
+  CheckCircle,
+  CurrencyDollar,
   Gauge,
   GitBranch,
-  Layers3,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+  Sparkle,
+  Stack,
+  Lightning,
+} from "@phosphor-icons/react";
 
 const models = [
   {
@@ -76,7 +76,7 @@ export default function CostIntelligence() {
           >
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-                <CircleDollarSign size={14} />
+                <CurrencyDollar size={14} />
               </span>
 
               <span className="attentra-label text-[var(--color-accent)]">
@@ -137,7 +137,7 @@ export default function CostIntelligence() {
               </div>
 
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                <Layers3 size={16} />
+                <Stack size={16} />
               </div>
             </div>
 
@@ -164,7 +164,7 @@ export default function CostIntelligence() {
               <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                    <Zap size={16} />
+                    <Lightning size={16} />
                   </div>
 
                   <div>
@@ -267,7 +267,7 @@ export default function CostIntelligence() {
                 <div className="relative rounded-2xl border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)]/50 p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--color-accent)] shadow-sm">
-                      <Sparkles size={15} />
+                      <Sparkle size={15} />
                     </div>
 
                     <div className="min-w-0">
@@ -303,7 +303,7 @@ export default function CostIntelligence() {
 
               <div className="mt-6 flex items-start gap-3 rounded-xl bg-[var(--color-accent-soft)]/50 p-4">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[var(--color-accent)] shadow-sm">
-                  <Check size={11} />
+                  <CheckCircle size={11} />
                 </span>
 
                 <p className="text-[11px] leading-5 text-[var(--color-foreground-secondary)]">
@@ -330,7 +330,7 @@ export default function CostIntelligence() {
           className="mt-6 grid overflow-hidden rounded-[1.5rem] border border-[var(--color-border)] bg-white sm:grid-cols-3"
         >
           <ValueItem
-            icon={CircleDollarSign}
+            icon={CurrencyDollar}
             title="Lower inference cost"
             description="Avoid unnecessary premium-model calls."
           />
@@ -342,7 +342,7 @@ export default function CostIntelligence() {
           />
 
           <ValueItem
-            icon={Sparkles}
+            icon={Sparkle}
             title="Preserve quality"
             description="Complex requests still get stronger models."
           />
@@ -416,7 +416,7 @@ function ModelCard({
         <div
           className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg ${model.accent}`}
         >
-          <Sparkles size={13} />
+          <Sparkle size={13} />
         </div>
 
         <div className="mt-3 truncate text-center text-[10px] font-semibold text-[var(--color-foreground)]">
@@ -486,7 +486,7 @@ function ValueItem({
   title,
   description,
 }: {
-  icon: typeof CircleDollarSign;
+  icon: typeof CurrencyDollar;
   title: string;
   description: string;
 }) {
