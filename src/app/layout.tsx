@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google';
+import { AuthProvider } from '@/components/providers/AuthProvider';
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -29,7 +30,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="font-body">{children}</body>
+      <body className="font-body">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

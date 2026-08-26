@@ -142,25 +142,87 @@ Use environment variables for all provider/database/authentication secrets.
 
 ## Development
 
-Install dependencies:
+### Requirements
+
+- **Node.js** 18+
+- **npm** (package-lock.json is present)
+- **PostgreSQL** database (recommended: [Neon](https://neon.tech))
+
+### Installation
 
 ```bash
 npm install
 ```
 
-Run development server:
+### Environment Setup
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTH_SECRET` | Generate with `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | `http://localhost:3000` (development) |
+| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret |
+
+### Google OAuth Configuration
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create an OAuth 2.0 Client ID (Web application)
+3. Set **Authorized JavaScript origins**: `http://localhost:3000`
+4. Set **Authorized redirect URIs**: `http://localhost:3000/api/auth/callback/google`
+5. For production (Vercel), add your production URL as an additional origin and redirect URI
+
+### Database Setup
+
+Generate Prisma Client:
+
+```bash
+npx prisma generate
+```
+
+Run migrations (requires `DATABASE_URL`):
+
+```bash
+npx prisma migrate dev --name initial_attentra_schema
+```
+
+### Development Server
 
 ```bash
 npm run dev
 ```
 
-Build:
+### Build
 
 ```bash
+npx prisma generate
+npx prisma migrate deploy
 npm run build
 ```
 
-Run the commands supported by the current repository's `package.json`.
+---
+
+## Phase 3 — Authentication + Database
+
+This phase implements:
+
+- **PostgreSQL** database via **Prisma ORM** (v6.19)
+- Complete schema: User, Account, Session, Business, Membership, ApiKey, Provider, Model, PricingSnapshot, Request, RoutingDecision
+- **Auth.js v5** with **Google OAuth** and **JWT sessions**
+- Prisma adapter for persistent user/account storage
+- Next.js middleware for route protection
+- Server-side authorization utilities (`requireAuth`, `requireBusinessMembership`)
+- Session provider for client components
+
+Provider integrations and routing engine are intentionally deferred to later phases.
 
 ---
 
