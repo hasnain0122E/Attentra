@@ -89,6 +89,23 @@ export interface PersistedRejectionData {
  * 1. Ensure the associated Request record exists (creates if missing)
  * 2. Upsert the RoutingDecision (handles duplicate protection via requestId @unique)
  *
+ * Immutability / Auditability:
+ *   A persisted RoutingDecision represents a point-in-time routing snapshot.
+ *   The candidateModels JSON captures the COMPLETE decision state at routing
+ *   time — all scored candidates with scores, projected costs, factors, and
+ *   all rejected candidates with reasons. This snapshot preserves the full
+ *   audit trail even if pricing changes later.
+ *
+ *   The upsert pattern provides idempotent persistence. Re-routing the same
+ *   requestId intentionally overwrites the previous decision — this represents
+ *   an explicit new routing decision, NOT an automatic pricing update.
+ *   Pricing changes from Phase 5 sync do NOT trigger re-routing; only an
+ *   explicit call to routeAndPersist() creates or updates a decision.
+ *
+ *   Historical pricing is preserved in PricingSnapshot.effectiveTo records,
+ *   ensuring that past pricing remains available for audit even when active
+ *   pricing has changed.
+ *
  * @param requestId  The Request ID to associate the decision with
  * @param decision   The routing decision to persist
  * @returns          Structured result with success/failure and decisionId

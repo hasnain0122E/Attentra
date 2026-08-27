@@ -2,7 +2,7 @@
  * Attentra — Routing Engine Public API
  *
  * Architecture.md v2.0 §8 — Routing Engine
- * Phase 6 / Step 3 — Production Routing Validation + Decision Persistence
+ * Phase 6 / Step 4 — Production Routing Execution Boundary
  *
  * Barrel export for the routing module. Other application modules
  * consume routing through these exports only.
@@ -16,6 +16,9 @@
  *
  *   // Database-backed routing + persistence
  *   import { routeAndPersist } from "@/lib/routing";
+ *
+ *   // Execution boundary (Step 4)
+ *   import { buildExecutionPlan, validateExecutionPlan, prepareExecutionFlow } from "@/lib/routing";
  */
 
 // ─────────────────────────────────────────────────────
@@ -115,3 +118,21 @@ export type {
   PersistedCandidateData,
   PersistedRejectionData,
 } from "./persistence";
+
+// ─────────────────────────────────────────────────────
+// EXECUTION BOUNDARY (Step 4)
+// ─────────────────────────────────────────────────────
+
+export {
+  buildExecutionPlan,
+  validateExecutionPlan,
+  prepareExecutionFlow,
+} from "./execution-plan";
+export type {
+  ExecutionStatus,
+  ExecutionTarget,
+  ExecutionPlan,
+  ExecutionResult,
+  ExecutionValidationError,
+  ExecutionPlanValidation,
+} from "./execution-plan";
