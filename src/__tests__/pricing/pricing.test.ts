@@ -8,7 +8,7 @@
  * database is available in the test environment.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
 import { Decimal } from "@prisma/client/runtime/library";
 import type {
   NormalizedModelPricing,
@@ -29,6 +29,120 @@ import {
 } from "@/lib/pricing/sources/markdown-parser";
 import * as fs from "fs";
 import * as path from "path";
+
+// ─────────────────────────────────────────────────────
+// MOCK FETCH FOR PRICING TESTS
+// ─────────────────────────────────────────────────────
+// File-level mock fetch prevents real HTTP calls during tests.
+// Production pricing sources remain capable of fetching official pages.
+// The "Safe Failure Handling" tests override fetch locally for error testing.
+
+const realFetch = globalThis.fetch;
+
+const MOCK_OPENAI_MD = `# OpenAI Pricing
+
+| Model | Input | Cached input | Cache writes | Output |
+| --- | --- | --- | --- | --- |
+| gpt-4o | $2.50 | $1.25 | $2.50 | $10.00 |
+| gpt-4o-mini | $0.15 | $0.075 | $0.15 | $0.60 |
+| gpt-4.1 | $2.00 | $0.50 | $1.00 | $8.00 |
+| gpt-4.1-mini | $0.40 | $0.10 | $0.20 | $1.60 |
+| o3-mini | $1.10 | $0.55 | - | $4.40 |
+| o4-mini | $1.10 | $0.275 | - | $4.40 |
+
+| Model | Input | Cached input | Cache writes | Output |
+| --- | --- | --- | --- | --- |
+| gpt-4o | $1.25 | $0.625 | $1.25 | $5.00 |
+| gpt-4o-mini | $0.075 | $0.0375 | $0.075 | $0.30 |
+| gpt-4.1 | $1.00 | $0.25 | $0.50 | $4.00 |
+| gpt-4.1-mini | $0.20 | $0.05 | $0.10 | $0.80 |
+| o3-mini | $0.55 | $0.275 | - | $2.20 |
+| o4-mini | $0.55 | $0.1375 | - | $2.20 |
+`;
+
+const MOCK_ANTHROPIC_MD = `# Anthropic Pricing
+
+| Model | Base Input Tokens | 5m Cache Writes | 1h Cache Writes | Cache Hits & Refreshes | Output Tokens |
+| --- | --- | --- | --- | --- | --- |
+| Claude Sonnet 5 | $3 | $3.75 | $5 | $0.30 | $15 |
+| Claude Opus 5 | $15 | $18.75 | $22.50 | $1.50 | $75 |
+| Claude Haiku 4.5 | $0.80 | $1.00 | $1.60 | $0.08 | $4 |
+`;
+
+const MOCK_GOOGLE_MD = `# Gemini Pricing
+
+*gemini-2.5-pro*Try it in Google AI Studio
+
+### Standard
+
+| | Free Tier | Paid Tier |
+| --- | --- | --- |
+| Input price | $0 | $1.25 / 1M tokens |
+| Output price | $0 | $10.00 / 1M tokens |
+| Context caching | $0 | $0.3125 / 1M tokens |
+
+### Batch
+
+| | Free Tier | Paid Tier |
+| --- | --- | --- |
+| Input price | $0 | $0.625 / 1M tokens |
+| Output price | $0 | $5.00 / 1M tokens |
+
+*gemini-2.5-flash*Try it in Google AI Studio
+
+### Standard
+
+| | Free Tier | Paid Tier |
+| --- | --- | --- |
+| Input price | $0 | $0.30 / 1M tokens |
+| Output price | $0 | $2.50 / 1M tokens |
+| Context caching | $0 | $0.075 / 1M tokens |
+
+### Batch
+
+| | Free Tier | Paid Tier |
+| --- | --- | --- |
+| Input price | $0 | $0.15 / 1M tokens |
+| Output price | $0 | $1.25 / 1M tokens |
+
+*gemini-2.5-flash-lite*Try it in Google AI Studio
+
+### Standard
+
+| | Free Tier | Paid Tier |
+| --- | --- | --- |
+| Input price | $0 | $0.10 / 1M tokens |
+| Output price | $0 | $0.40 / 1M tokens |
+| Context caching | $0 | $0.025 / 1M tokens |
+
+### Batch
+
+| | Free Tier | Paid Tier |
+| --- | --- | --- |
+| Input price | $0 | $0.05 / 1M tokens |
+| Output price | $0 | $0.20 / 1M tokens |
+`;
+
+function mockPricingFetch(url: string | URL | Request, init?: RequestInit): Promise<Response> {
+  const urlStr = typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
+  let content: string | undefined;
+  if (urlStr.includes("openai")) content = MOCK_OPENAI_MD;
+  else if (urlStr.includes("claude") || urlStr.includes("anthropic")) content = MOCK_ANTHROPIC_MD;
+  else if (urlStr.includes("google") || urlStr.includes("gemini")) content = MOCK_GOOGLE_MD;
+
+  if (content) {
+    return Promise.resolve(new Response(content, { status: 200 }));
+  }
+  return realFetch(url, init);
+}
+
+beforeAll(() => {
+  globalThis.fetch = mockPricingFetch as typeof fetch;
+});
+
+afterAll(() => {
+  globalThis.fetch = realFetch;
+});
 
 // ─────────────────────────────────────────────────────
 // 1. PRICING SOURCE NORMALIZATION TESTS

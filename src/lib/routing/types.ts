@@ -340,6 +340,12 @@ export interface RoutingResult {
 
   /** Rejected candidates for debugging (present on both success and failure) */
   rejected?: RejectedCandidate[];
+
+  /** Persistence result when routeAndPersist is used */
+  persisted?: { success: boolean; decisionId?: string };
+
+  /** Persistence error (present when persistence failed but routing succeeded) */
+  persistenceError?: string;
 }
 
 /**

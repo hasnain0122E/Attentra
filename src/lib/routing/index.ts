@@ -2,7 +2,7 @@
  * Attentra — Routing Engine Public API
  *
  * Architecture.md v2.0 §8 — Routing Engine
- * Phase 6 / Step 2 — Database-Backed Routing
+ * Phase 6 / Step 3 — Production Routing Validation + Decision Persistence
  *
  * Barrel export for the routing module. Other application modules
  * consume routing through these exports only.
@@ -13,6 +13,9 @@
  *
  *   // Database-backed routing (production)
  *   import { routeWithDatabase } from "@/lib/routing";
+ *
+ *   // Database-backed routing + persistence
+ *   import { routeAndPersist } from "@/lib/routing";
  */
 
 // ─────────────────────────────────────────────────────
@@ -96,8 +99,19 @@ export { loadRoutingCandidates } from "./database";
 export type { CandidateLoadResult } from "./database";
 
 // ─────────────────────────────────────────────────────
-// ROUTER (Step 2)
+// ROUTER (Step 2 + Step 3)
 // ─────────────────────────────────────────────────────
 
-export { route, routeWithDatabase } from "./router";
-export type { RouterOptions, DatabaseRouterOptions } from "./router";
+export { route, routeWithDatabase, routeAndPersist } from "./router";
+export type { RouterOptions, DatabaseRouterOptions, RouteAndPersistOptions } from "./router";
+
+// ─────────────────────────────────────────────────────
+// PERSISTENCE (Step 3)
+// ─────────────────────────────────────────────────────
+
+export { persistRoutingDecision } from "./persistence";
+export type {
+  PersistenceResult,
+  PersistedCandidateData,
+  PersistedRejectionData,
+} from "./persistence";

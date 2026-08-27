@@ -1,7 +1,7 @@
 /**
  * Attentra — Routing Engine
  *
- * Phase 6 / Step 2 — Database-Backed Routing
+ * Phase 6 / Step 3 — Production Routing Validation + Decision Persistence
  *
  * The main router orchestrates the complete routing pipeline:
  *
@@ -14,10 +14,12 @@
  *     → Provider-Diverse Fallback Ordering
  *     → Explanation Generation
  *     → Routing Decision
+ *     → Optional Persistence
  *
  * Architecture:
  *   route(request, options)              — Pure routing (candidates injected)
  *   routeWithDatabase(request, options)   — Database-backed routing
+ *   routeAndPersist(request, options)     — Database-backed routing + persistence
  *
  * The router MUST be deterministic for identical inputs and identical
  * model/pricing state. This enables reproducible routing audits.
@@ -45,6 +47,7 @@ import { orderFallbacks } from "./fallback";
 import { explainDecision } from "./explanations";
 import { resolvePolicy } from "./policies";
 import { loadRoutingCandidates } from "./database";
+import { persistRoutingDecision } from "./persistence";
 
 // ─────────────────────────────────────────────────────
 // TYPES
@@ -65,6 +68,14 @@ export interface RouterOptions {
  * Options for the database-backed routing engine.
  */
 export interface DatabaseRouterOptions {
+  /** Routing policy name or custom policy object */
+  policy?: string | RoutingPolicy;
+}
+
+/**
+ * Options for database-backed routing with persistence.
+ */
+export interface RouteAndPersistOptions {
   /** Routing policy name or custom policy object */
   policy?: string | RoutingPolicy;
 }
@@ -235,6 +246,53 @@ export async function routeWithDatabase(
       errorCode: "DATABASE_ERROR",
     };
   }
+}
+
+/**
+ * Execute the routing pipeline with database-backed candidate loading
+ * and optional persistence.
+ *
+ * Full flow:
+ * 1. Load candidates from PostgreSQL
+ * 2. Run the full routing pipeline
+ * 3. Persist RoutingDecision when requestId is provided in metadata
+ * 4. Return routing result with persistence info
+ *
+ * Persistence is optional — if no requestId is in metadata, routing
+ * proceeds normally without persistence.
+ *
+ * @param request  The routing request (metadata.requestId enables persistence)
+ * @param options  Routing options (policy only)
+ * @returns        Routing result with optional persistence info
+ */
+export async function routeAndPersist(
+  request: RoutingRequest,
+  options?: RouteAndPersistOptions
+): Promise<RoutingResult> {
+  // 1. Run database-backed routing
+  const result = await routeWithDatabase(request, options);
+
+  if (!result.success || !result.decision) {
+    return result;
+  }
+
+  // 2. Persist if requestId is provided
+  const requestId = request.metadata?.requestId as string | undefined;
+  if (requestId) {
+    const persistResult = await persistRoutingDecision(requestId, result.decision);
+    if (persistResult.success) {
+      return {
+        ...result,
+        persisted: { success: true, decisionId: persistResult.decisionId },
+      };
+    }
+    return {
+      ...result,
+      persistenceError: persistResult.error,
+    };
+  }
+
+  return result;
 }
 
 // ─────────────────────────────────────────────────────
