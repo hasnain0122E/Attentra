@@ -1,6 +1,6 @@
 // Attentra — Prisma Schema
-// Phase 3: Authentication + Database Foundation
-// Architecture.md v2.0 §5, §9
+// Phase 5: Dynamic Model Registry + Pricing Intelligence
+// Architecture.md v2.0 §5, §7, §9, §10
 
 generator client {
   provider = "prisma-client-js"
@@ -120,26 +120,31 @@ model ApiKey {
 // ─────────────────────────────────────────────────────
 
 model Provider {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  status    ProviderStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
+  id                String    @id @default(cuid())
+  name              String    @unique
+  status            ProviderStatus @default(ACTIVE)
+  pricingSourceUrl  String?   @db.Text
+  lastPricingSyncAt DateTime?
+  createdAt         DateTime  @default(now())
 
-  models Model[]
+  models        Model[]
+  pricingSyncs  PricingSyncLog[]
 }
 
 model Model {
-  id                String   @id @default(cuid())
+  id                String      @id @default(cuid())
   providerId        String
   modelIdentifier   String
   displayName       String
   capabilities      String[]
-  inputPricePer1k   Decimal  @db.Decimal(12, 8)
-  outputPricePer1k  Decimal  @db.Decimal(12, 8)
+  tier              ModelTier?
+  contextWindow     Int?
+  inputPricePer1k   Decimal     @db.Decimal(12, 8)
+  outputPricePer1k  Decimal     @db.Decimal(12, 8)
   expectedLatencyMs Int?
-  active            Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  active            Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   provider         Provider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
   pricingSnapshots PricingSnapshot[]
@@ -154,15 +159,38 @@ model Model {
 // ─────────────────────────────────────────────────────
 
 model PricingSnapshot {
-  id               String    @id @default(cuid())
-  modelId          String
-  inputPricePer1k  Decimal   @db.Decimal(12, 8)
-  outputPricePer1k Decimal   @db.Decimal(12, 8)
-  effectiveFrom    DateTime  @default(now())
-  effectiveTo      DateTime?
-  createdAt        DateTime  @default(now())
+  id                    String    @id @default(cuid())
+  modelId               String
+  inputPricePer1k       Decimal   @db.Decimal(12, 8)
+  outputPricePer1k      Decimal   @db.Decimal(12, 8)
+  cachedInputPricePer1k Decimal?  @db.Decimal(12, 8)
+  batchInputPricePer1k  Decimal?  @db.Decimal(12, 8)
+  batchOutputPricePer1k Decimal?  @db.Decimal(12, 8)
+  pricingDimensions     Json?
+  source                String?
+  effectiveFrom         DateTime  @default(now())
+  effectiveTo           DateTime?
+  createdAt             DateTime  @default(now())
 
   model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────
+// PRICING SYNC LOG
+// ─────────────────────────────────────────────────────
+
+model PricingSyncLog {
+  id           String     @id @default(cuid())
+  providerId   String
+  status       SyncStatus
+  modelsSynced Int        @default(0)
+  pricesUpdated Int       @default(0)
+  error        String?    @db.Text
+  triggeredBy  String     @default("manual")
+  startedAt    DateTime   @default(now())
+  completedAt  DateTime?
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 }
 
 // ─────────────────────────────────────────────────────
@@ -236,4 +264,16 @@ enum RequestStatus {
   FAILED
   TIMEOUT_ERROR
   PROVIDER_ERROR
+}
+
+enum ModelTier {
+  LIGHT
+  MID
+  HEAVY
+}
+
+enum SyncStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
 }
