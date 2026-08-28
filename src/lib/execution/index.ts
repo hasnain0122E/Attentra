@@ -1,7 +1,7 @@
 /**
  * Attentra — Execution Layer Public API
  *
- * Phase 7 / Step 1–2 — Provider Adapter Foundation + Execution Abstraction
+ * Phase 7 / Step 1–4 — Provider Adapter Foundation + Production Execution + Orchestration
  *
  * Barrel export for the execution module. Other application modules
  * consume the execution layer through these exports only.
@@ -34,7 +34,9 @@
 export type {
   ExecutionRequest,
   ExecutionConfig,
+  ExecutionOptions,
   ProviderAdapter,
+  ExecutionProvider,
 } from "./types";
 
 export { BaseExecutionAdapter, DEFAULT_EXECUTION_TIMEOUT_MS } from "./types";
@@ -111,3 +113,36 @@ export { Executor, executeRequest } from "./executor";
 // ─────────────────────────────────────────────────────
 
 export { Dispatcher, executeExecutionPlan } from "./dispatcher";
+
+// ─────────────────────────────────────────────────────
+// PROVIDER REGISTRY (Step 3)
+// ─────────────────────────────────────────────────────
+
+export {
+  ProviderRegistry,
+  createDefaultProviderRegistry,
+  getProviderRegistry,
+} from "./provider-registry";
+
+// ─────────────────────────────────────────────────────
+// EXECUTION SERVICE (Step 3)
+// ─────────────────────────────────────────────────────
+
+export { ExecutionService, getExecutionService } from "./execution-service";
+
+// ─────────────────────────────────────────────────────
+// ORCHESTRATOR (Step 4)
+// ─────────────────────────────────────────────────────
+
+export type {
+  ExecutionAttempt,
+  OrchestratorOptions,
+  OrchestratorResult,
+} from "./orchestrator";
+
+export {
+  ExecutionOrchestrator,
+  orchestrateExecution,
+  computeActualCost,
+  MAX_ORCHESTRATOR_ATTEMPTS,
+} from "./orchestrator";

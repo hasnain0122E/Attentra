@@ -1,7 +1,7 @@
 /**
  * Attentra — BlueMinds Execution Adapter
  *
- * Phase 7 / Step 2 — Provider Execution Abstraction + BlueMinds Adapter
+ * Phase 7 / Step 2–3 — Provider Execution Abstraction + Production Execution
  *
  * Native HTTP adapter that executes requests against the BlueMinds
  * OpenAI-compatible chat completion API using native fetch.
@@ -30,8 +30,15 @@
  *   - Error messages are sanitized to strip credentials
  */
 
-import type { ProviderAdapter, ExecutionRequest } from "../types";
-import type { ExecutionResult } from "@/lib/routing/execution-plan";
+import type {
+  ProviderAdapter,
+  ExecutionRequest,
+  ExecutionOptions,
+} from "../types";
+import type {
+  ExecutionResult,
+  ExecutionTarget,
+} from "@/lib/routing/execution-plan";
 import {
   NormalizedExecutionError,
   type ExecutionErrorCode,
@@ -77,14 +84,18 @@ export interface BlueMindsConfig {
 }
 
 /**
- * Resolve BlueMinds configuration from explicit values and environment.
+ * Resolve BlueMinds configuration from explicit values, per-request options,
+ * and environment (highest precedence first):
  *
- * Environment variables:
- *   BLUEMINDS_API_KEY      — API key
- *   BLUEMINDS_BASE_URL     — Base URL override
- *   BLUEMINDS_TIMEOUT_MS   — Timeout override
+ *   per-request options.timeoutMs
+ *   → constructor config
+ *   → BLUEMINDS_API_KEY / BLUEMINDS_BASE_URL / BLUEMINDS_TIMEOUT_MS
+ *   → safe defaults
  */
-function resolveConfig(config?: BlueMindsConfig): {
+function resolveConfig(
+  config?: BlueMindsConfig,
+  options?: ExecutionOptions
+): {
   apiKey: string | undefined;
   baseUrl: string;
   timeoutMs: number;
@@ -96,6 +107,7 @@ function resolveConfig(config?: BlueMindsConfig): {
       process.env.BLUEMINDS_BASE_URL ??
       DEFAULT_BLUEMINDS_BASE_URL,
     timeoutMs:
+      options?.timeoutMs ??
       config?.timeoutMs ??
       (process.env.BLUEMINDS_TIMEOUT_MS
         ? parseInt(process.env.BLUEMINDS_TIMEOUT_MS, 10)
@@ -121,6 +133,9 @@ export class BlueMindsExecutionAdapter implements ProviderAdapter {
   readonly providerId = BLUEMINDS_PROVIDER_ID;
   readonly providerName = BLUEMINDS_PROVIDER_NAME;
 
+  /** Capability metadata (informational only — model selection stays in routing) */
+  readonly capabilities: readonly string[] = ["chat", "openai-compatible"];
+
   private readonly config: BlueMindsConfig;
 
   constructor(config?: BlueMindsConfig) {
@@ -139,16 +154,26 @@ export class BlueMindsExecutionAdapter implements ProviderAdapter {
    * Execute a request against the BlueMinds chat completion API.
    *
    * Flow:
-   * 1. Resolve and validate configuration (env vars + explicit config)
+   * 1. Resolve and validate configuration (env vars + explicit config
+   *    + per-request options override)
    * 2. Build OpenAI-compatible request body
    * 3. Set up AbortController for timeout
    * 4. POST to BlueMinds
    * 5. Parse and normalize response
    * 6. Return ExecutionResult
+   *
+   * @param request  Provider-neutral execution request
+   * @param _target  Optional ExecutionPlan target context (informational —
+   *                 the request already carries the model to execute)
+   * @param options  Optional per-request execution options (timeoutMs)
    */
-  async execute(request: ExecutionRequest): Promise<ExecutionResult> {
+  async execute(
+    request: ExecutionRequest,
+    _target?: ExecutionTarget,
+    options?: ExecutionOptions
+  ): Promise<ExecutionResult> {
     const startTime = Date.now();
-    const resolved = resolveConfig(this.config);
+    const resolved = resolveConfig(this.config, options);
 
     // 1. Validate API key
     if (!resolved.apiKey) {
@@ -201,7 +226,23 @@ export class BlueMindsExecutionAdapter implements ProviderAdapter {
       }
 
       // 6. Parse and normalize successful response
-      const data = await response.json();
+      let data: Record<string, unknown>;
+      try {
+        data = (await response.json()) as Record<string, unknown>;
+      } catch {
+        return {
+          success: false,
+          providerId: this.providerId,
+          modelId: request.modelId,
+          error: {
+            code: "INVALID_RESPONSE",
+            message: "BlueMinds returned a non-JSON response",
+            retryable: false,
+          },
+          latencyMs: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+        };
+      }
       const latencyMs = Date.now() - startTime;
 
       return normalizeResponse(data, request, this.providerId, latencyMs);

@@ -1,7 +1,7 @@
 /**
  * Attentra — Execution Dispatcher
  *
- * Phase 7 / Step 2 — Provider Execution Abstraction + BlueMinds Adapter
+ * Phase 7 / Step 2–3 — Provider Execution Abstraction + Production Execution
  *
  * Bridges the routing engine's ExecutionPlan to the execution layer's
  * ProviderAdapter. The dispatcher:
@@ -140,9 +140,10 @@ export class Dispatcher {
     // 4. Build ExecutionRequest from ExecutionPlan
     const request = buildExecutionRequest(plan, messages);
 
-    // 5. Execute through the resolved adapter
-    const result = await this.executor.execute(request, config);
-
+    // 5. Execute through the resolved adapter (forward the primary target
+    //    as ExecutionPlan context for the provider contract)
+    const result = await this.executor.execute(request, config, plan.primary);
+    
     return result;
   }
 
@@ -199,6 +200,8 @@ function buildExecutionRequest(
     modelIdentifier: plan.primary.modelIdentifier,
     messages,
     maxTokens: plan.estimatedOutputTokens || undefined,
+    estimatedInputTokens: plan.estimatedInputTokens,
+    estimatedOutputTokens: plan.estimatedOutputTokens,
     requestId: plan.requestId ?? generateRequestId(),
     metadata: {
       taskType: plan.taskType,

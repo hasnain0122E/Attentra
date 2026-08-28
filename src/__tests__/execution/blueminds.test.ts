@@ -1,7 +1,7 @@
 /**
  * Attentra — BlueMinds Execution Adapter Tests
  *
- * Phase 7 / Step 2 — Provider Execution Abstraction + BlueMinds Adapter
+ * Phase 7 / Step 2–3 — Provider Execution Abstraction + Production Execution
  *
  * Tests for the BlueMinds adapter using mocked fetch:
  *
@@ -11,6 +11,7 @@
  * 4. Error handling (HTTP status codes, network, timeout)
  * 5. Security (no secret leakage)
  * 6. Provider neutrality (no hardcoded models/prices)
+ * 7. Step 3 contract extensions (options, target, capabilities)
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -493,6 +494,63 @@ describe("BlueMinds — Error Handling", () => {
     expect(result.error?.retryable).toBe(true);
   });
 
+  it("returns SERVER_ERROR for 503", async () => {
+    mockFetch(
+      jsonResponse(
+        { error: { message: "Service unavailable" } },
+        503
+      )
+    );
+    const result = await adapter().execute(makeRequest());
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("SERVER_ERROR");
+    expect(result.error?.retryable).toBe(true);
+  });
+
+  it("returns SERVER_ERROR for 504", async () => {
+    mockFetch(
+      jsonResponse(
+        { error: { message: "Gateway timeout" } },
+        504
+      )
+    );
+    const result = await adapter().execute(makeRequest());
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("SERVER_ERROR");
+    expect(result.error?.retryable).toBe(true);
+  });
+
+  it("returns SERVER_ERROR for 504 with a non-JSON (HTML) error body", async () => {
+    mockFetch(
+      new Response(
+        "<html><head><title>504 Gateway Time-out</title></head></html>",
+        { status: 504 }
+      )
+    );
+    const result = await adapter().execute(makeRequest());
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("SERVER_ERROR");
+    expect(result.error?.retryable).toBe(true);
+    expect(result.error?.message).toContain("504");
+  });
+
+  it("returns MODEL_UNAVAILABLE for 404", async () => {
+    mockFetch(
+      jsonResponse(
+        { error: { message: "Model not found" } },
+        404
+      )
+    );
+    const result = await adapter().execute(makeRequest());
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("MODEL_UNAVAILABLE");
+    expect(result.error?.retryable).toBe(false);
+  });
+
   it("returns INVALID_RESPONSE for malformed JSON body", async () => {
     // Valid JSON but not a valid chat completion response
     mockFetch(jsonResponse({ unexpected: "data" }));
@@ -509,6 +567,20 @@ describe("BlueMinds — Error Handling", () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe("INVALID_RESPONSE");
+  });
+
+  it("returns INVALID_RESPONSE for a non-JSON success body", async () => {
+    mockFetch(
+      new Response("<html>not json</html>", {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      })
+    );
+    const result = await adapter().execute(makeRequest());
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_RESPONSE");
+    expect(result.error?.retryable).toBe(false);
   });
 
   it("returns NETWORK_ERROR on fetch failure", async () => {
@@ -695,5 +767,94 @@ describe("BlueMinds — Provider Neutrality", () => {
 
     expect(body1.model).toBe("model-alpha");
     expect(body2.model).toBe("model-beta");
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// 7. STEP 3 CONTRACT EXTENSIONS
+// ─────────────────────────────────────────────────────
+
+describe("BlueMinds — Step 3 Contract Extensions", () => {
+  it("falls back to the default base URL when none is configured", async () => {
+    const { calls } = mockFetch(jsonResponse(successBody()));
+
+    const a = new BlueMindsExecutionAdapter({ apiKey: TEST_API_KEY });
+    await a.execute(makeRequest());
+
+    expect(calls()[0].url).toBe(
+      `${DEFAULT_BLUEMINDS_BASE_URL}/chat/completions`
+    );
+  });
+
+  it("honors per-request timeout options over constructor config", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((_url: string, opts: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          if (opts.signal) {
+            opts.signal.addEventListener("abort", () => {
+              const err = new Error("The operation was aborted");
+              err.name = "AbortError";
+              reject(err);
+            });
+          }
+        });
+      }) as unknown as typeof fetch;
+
+    // Constructor timeout is long; the per-request option must win
+    const a = new BlueMindsExecutionAdapter({
+      apiKey: TEST_API_KEY,
+      baseUrl: TEST_BASE_URL,
+      timeoutMs: 10_000,
+    });
+
+    const result = await a.execute(makeRequest(), undefined, { timeoutMs: 50 });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("REQUEST_TIMEOUT");
+    expect(result.error?.retryable).toBe(true);
+  });
+
+  it("accepts an optional ExecutionPlan target without altering the request", async () => {
+    const { calls } = mockFetch(jsonResponse(successBody()));
+
+    const target = {
+      entryId: "primary",
+      modelId: "bm-model-1",
+      providerId: "blueminds",
+      providerName: "BlueMinds",
+      modelIdentifier: "target-model-x",
+      displayName: "Target Model X",
+      projectedCost: 0.001,
+      routingScore: 0.9,
+    };
+
+    const result = await adapter().execute(makeRequest(), target);
+
+    expect(result.success).toBe(true);
+    // The request body must still use the request's model identifier,
+    // not anything derived from the target
+    const body = JSON.parse(calls()[0].options.body);
+    expect(body.model).toBe("deepseek-v3");
+  });
+
+  it("exposes capability metadata", () => {
+    const a = new BlueMindsExecutionAdapter();
+
+    expect(Array.isArray(a.capabilities)).toBe(true);
+    expect(a.capabilities).toContain("chat");
+    expect(a.capabilities).toContain("openai-compatible");
+  });
+
+  it("accepts token estimates without sending them as provider parameters", async () => {
+    const { calls } = mockFetch(jsonResponse(successBody()));
+
+    await adapter().execute(
+      makeRequest({ estimatedInputTokens: 120, estimatedOutputTokens: 40 })
+    );
+
+    const body = JSON.parse(calls()[0].options.body);
+    expect(body).not.toHaveProperty("estimatedInputTokens");
+    expect(body).not.toHaveProperty("estimatedOutputTokens");
   });
 });

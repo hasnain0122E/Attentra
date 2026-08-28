@@ -23,9 +23,17 @@
  * One execution request → one adapter → one normalized result.
  */
 
-import type { ExecutionRequest, ExecutionConfig, ProviderAdapter } from "./types";
+import type {
+  ExecutionRequest,
+  ExecutionConfig,
+  ExecutionOptions,
+  ProviderAdapter,
+} from "./types";
 import { DEFAULT_EXECUTION_TIMEOUT_MS } from "./types";
-import type { ExecutionResult } from "@/lib/routing/execution-plan";
+import type {
+  ExecutionResult,
+  ExecutionTarget,
+} from "@/lib/routing/execution-plan";
 import { ExecutionAdapterRegistry } from "./registry";
 import {
   NormalizedExecutionError,
@@ -60,11 +68,14 @@ export class Executor {
    *
    * @param request  Provider-neutral execution request
    * @param config   Optional per-request execution config override
+   * @param target   Optional ExecutionPlan target context forwarded to
+   *                 the provider (ExecutionProvider contract)
    * @returns        Normalized execution result
    */
   async execute(
     request: ExecutionRequest,
-    config?: ExecutionConfig
+    config?: ExecutionConfig,
+    target?: ExecutionTarget
   ): Promise<ExecutionResult> {
     const startTime = Date.now();
     const timeoutMs = config?.timeoutMs ?? this.defaultTimeoutMs;
@@ -86,11 +97,14 @@ export class Executor {
         );
       }
 
-      // 3. Execute with timeout protection
+      // 3. Execute with timeout protection (target + options are forwarded
+      //    to the provider as part of the ExecutionProvider contract)
       const result = await executeWithTimeout(
         adapter,
         request,
-        timeoutMs
+        timeoutMs,
+        target,
+        config
       );
 
       return result;
@@ -144,9 +158,11 @@ export async function executeRequest(
 async function executeWithTimeout(
   adapter: ProviderAdapter,
   request: ExecutionRequest,
-  timeoutMs: number
+  timeoutMs: number,
+  target?: ExecutionTarget,
+  options?: ExecutionOptions
 ): Promise<ExecutionResult> {
-  const executionPromise = adapter.execute(request);
+  const executionPromise = adapter.execute(request, target, options);
 
   const timeoutPromise = new Promise<ExecutionResult>((resolve) => {
     const timer = setTimeout(() => {

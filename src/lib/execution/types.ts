@@ -1,7 +1,7 @@
 /**
  * Attentra — Execution Layer Types
  *
- * Phase 7 / Step 1 — Provider Adapter Foundation
+ * Phase 7 / Step 1–3 — Provider Adapter Foundation + Production Execution
  *
  * Provider-neutral types for the execution boundary.
  * This layer sits between the routing engine's ExecutionPlan
@@ -21,7 +21,10 @@
  */
 
 import type { AIProvider } from "@/lib/providers";
-import type { ExecutionResult } from "@/lib/routing/execution-plan";
+import type {
+  ExecutionResult,
+  ExecutionTarget,
+} from "@/lib/routing/execution-plan";
 import { NormalizedExecutionError, mapProviderErrorCode } from "./errors";
 
 // ─────────────────────────────────────────────────────
@@ -58,6 +61,12 @@ export interface ExecutionRequest {
   /** Sampling temperature (0.0–2.0) */
   temperature?: number;
 
+  /** Estimated input tokens from routing token estimation (if available) */
+  estimatedInputTokens?: number;
+
+  /** Estimated output tokens from routing token estimation (if available) */
+  estimatedOutputTokens?: number;
+
   /** Unique request identifier for correlation */
   requestId: string;
 
@@ -81,6 +90,12 @@ export interface ExecutionConfig {
 /** Default execution timeout: 30 seconds */
 export const DEFAULT_EXECUTION_TIMEOUT_MS = 30_000;
 
+/**
+ * Per-request execution options (Phase 7 Step 3 naming).
+ * Structurally identical to ExecutionConfig.
+ */
+export type ExecutionOptions = ExecutionConfig;
+
 // ─────────────────────────────────────────────────────
 // PROVIDER ADAPTER INTERFACE
 // ─────────────────────────────────────────────────────
@@ -99,7 +114,20 @@ export const DEFAULT_EXECUTION_TIMEOUT_MS = 30_000;
  * An adapter typically wraps an AIProvider instance and bridges
  * between ExecutionRequest ↔ NormalizedAIRequest.
  */
-export interface ProviderAdapter {
+/**
+ * The provider-neutral execution contract (Phase 7 Step 3 canonical name).
+ *
+ * Each provider (BlueMinds, OpenAI, Anthropic, Google, Mock) implements
+ * this interface. The execution layer interacts ONLY with this contract —
+ * never with provider-specific API code.
+ *
+ * Providers receive everything needed for execution through:
+ * - `request`  — modelId, providerId, modelIdentifier, messages, token
+ *                estimates, maxTokens, requestId, metadata
+ * - `target`   — optional ExecutionPlan target context (Phase 6 contract)
+ * - `options`  — optional per-request execution options (e.g., timeoutMs)
+ */
+export interface ExecutionProvider {
   /** Provider identifier (must match database Provider.id prefix) */
   readonly providerId: string;
 
@@ -107,10 +135,17 @@ export interface ProviderAdapter {
   readonly providerName: string;
 
   /**
-   * Check whether this adapter supports the given model.
+   * Optional capability metadata describing what this provider supports
+   * (e.g., ["chat", "openai-compatible"]). Informational only — model
+   * selection stays in the routing engine.
+   */
+  readonly capabilities?: readonly string[];
+
+  /**
+   * Check whether this provider supports the given model.
    *
    * @param modelId  Internal database model ID
-   * @returns        True if this adapter can execute requests for the model
+   * @returns        True if this provider can execute requests for the model
    */
   supports(modelId: string): boolean;
 
@@ -118,10 +153,16 @@ export interface ProviderAdapter {
    * Execute an LLM request through this provider.
    *
    * @param request  Provider-neutral execution request
+   * @param target   Optional ExecutionPlan target context
+   * @param options  Optional per-request execution options
    * @returns        Normalized execution result
    * @throws         On provider failure (executor normalizes unexpected errors)
    */
-  execute(request: ExecutionRequest): Promise<ExecutionResult>;
+  execute(
+    request: ExecutionRequest,
+    target?: ExecutionTarget,
+    options?: ExecutionOptions
+  ): Promise<ExecutionResult>;
 
   /**
    * Normalize a raw error into a structured execution error.
@@ -130,7 +171,19 @@ export interface ProviderAdapter {
    * @returns      Normalized execution error
    */
   normalizeError(error: unknown): import("./errors").NormalizedExecutionError;
+
+  /**
+   * Optional health check. May perform a network call — invoke deliberately.
+   */
+  isHealthy?(): Promise<boolean>;
 }
+
+/**
+ * Step 1 name for the provider-neutral execution contract.
+ * Kept as an alias for backward compatibility with existing imports;
+ * structurally identical to ExecutionProvider.
+ */
+export type ProviderAdapter = ExecutionProvider;
 
 // ─────────────────────────────────────────────────────
 // ADAPTER WRAPPER (shared implementation)

@@ -31,7 +31,10 @@ export type MockBehavior =
   | "rate_limit"
   | "authentication"
   | "invalid_request"
-  | "model_unavailable";
+  | "model_unavailable"
+  | "server_error"
+  | "network_error"
+  | "context_length";
 
 /**
  * Mock provider adapter for testing.
@@ -164,6 +167,48 @@ export class MockProviderAdapter implements ProviderAdapter {
           error: {
             code: "MODEL_UNAVAILABLE",
             message: `Mock model "${request.modelIdentifier}" is unavailable`,
+            retryable: false,
+          },
+          latencyMs: this.latencyMs,
+          timestamp,
+        };
+
+      case "server_error":
+        return {
+          success: false,
+          providerId: this.providerId,
+          modelId: request.modelId,
+          error: {
+            code: "SERVER_ERROR",
+            message: "Mock server error (5xx)",
+            retryable: true,
+          },
+          latencyMs: this.latencyMs,
+          timestamp,
+        };
+
+      case "network_error":
+        return {
+          success: false,
+          providerId: this.providerId,
+          modelId: request.modelId,
+          error: {
+            code: "NETWORK_ERROR",
+            message: "Mock network connectivity failure",
+            retryable: true,
+          },
+          latencyMs: this.latencyMs,
+          timestamp,
+        };
+
+      case "context_length":
+        return {
+          success: false,
+          providerId: this.providerId,
+          modelId: request.modelId,
+          error: {
+            code: "CONTEXT_LENGTH",
+            message: "Mock context length exceeded",
             retryable: false,
           },
           latencyMs: this.latencyMs,

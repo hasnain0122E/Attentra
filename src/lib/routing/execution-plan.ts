@@ -224,6 +224,9 @@ export interface ExecutionResult {
   /** Actual cost in USD (from provider billing, not projected) */
   actualCost?: number;
 
+  /** Total number of execution attempts (primary + any fallbacks attempted) */
+  attempts?: number;
+
   /** Error details when execution failed */
   error?: {
     code: string;
