@@ -35,6 +35,16 @@ function toOpenAIMessages(
 }
 
 /**
+ * Newer OpenAI reasoning models (o-series, GPT-5 and later) replaced the
+ * legacy `max_tokens` parameter with `max_completion_tokens` and reject
+ * requests that still send the legacy parameter. The correct parameter is
+ * selected from the model identifier — no hardcoded model assumptions.
+ */
+function usesCompletionTokensParam(modelId: string): boolean {
+  return /^o\d/.test(modelId) || /^gpt-[5-9]/.test(modelId);
+}
+
+/**
  * Translate OpenAI SDK errors into normalized AttentraProviderError.
  */
 function normalizeError(error: unknown): AttentraProviderError {
@@ -215,10 +225,14 @@ export class OpenAIProvider implements AIProvider {
     const startTime = Date.now();
 
     try {
+      const maxTokensParam = usesCompletionTokensParam(modelId)
+        ? { max_completion_tokens: request.maxTokens }
+        : { max_tokens: request.maxTokens };
+
       const response = await this.client.chat.completions.create({
         model: modelId,
         messages: toOpenAIMessages(request.messages),
-        max_tokens: request.maxTokens,
+        ...maxTokensParam,
         temperature: request.temperature,
       });
 
