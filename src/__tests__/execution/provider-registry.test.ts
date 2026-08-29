@@ -110,7 +110,7 @@ describe("Provider Registry — Default Registry", () => {
   it("includes the existing Step 1 provider adapters", () => {
     const ids = createDefaultProviderRegistry().listProviderIds().sort();
 
-    expect(ids).toEqual(["anthropic", "blueminds", "google", "openai"]);
+    expect(ids).toEqual(["anthropic", "blueminds", "google", "openai", "openrouter"]);
   });
 
   it("resolves every registered provider without error", () => {

@@ -26,6 +26,7 @@ import { createBlueMindsAdapter } from "./providers/blueminds";
 import { createOpenAIAdapter } from "./providers/openai";
 import { createAnthropicAdapter } from "./providers/anthropic";
 import { createGoogleAdapter } from "./providers/google";
+import { createOpenRouterAdapter } from "./providers/openrouter";
 
 export class ProviderRegistry {
   private readonly adapters: ExecutionAdapterRegistry;
@@ -97,6 +98,7 @@ export function createDefaultProviderRegistry(): ProviderRegistry {
   registry.register(createOpenAIAdapter());
   registry.register(createAnthropicAdapter());
   registry.register(createGoogleAdapter());
+  registry.register(createOpenRouterAdapter());
 
   return registry;
 }

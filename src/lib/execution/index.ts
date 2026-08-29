@@ -95,6 +95,21 @@ export {
 
 export type { BlueMindsConfig } from "./providers/blueminds";
 
+// ─────────────────────────────────────────────────
+// OPENROUTER ADAPTER (Phase 8 Step 1)
+// ─────────────────────────────────────────────────
+
+export {
+  createOpenRouterAdapter,
+  OpenRouterExecutionAdapter,
+  OPENROUTER_PROVIDER_ID,
+  OPENROUTER_PROVIDER_NAME,
+  DEFAULT_OPENROUTER_BASE_URL,
+  DEFAULT_OPENROUTER_TIMEOUT_MS,
+} from "./providers/openrouter";
+
+export type { OpenRouterConfig } from "./providers/openrouter";
+
 // ─────────────────────────────────────────────────────
 // MOCK ADAPTER
 // ─────────────────────────────────────────────────────

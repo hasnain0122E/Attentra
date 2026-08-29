@@ -356,6 +356,7 @@ describe("ExecutionService — Defaults and Neutrality", () => {
       "blueminds",
       "google",
       "openai",
+      "openrouter",
     ]);
   });
 
