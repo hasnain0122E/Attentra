@@ -8,10 +8,11 @@
  *   ExecutionPlan → ExecutionOrchestrator → ProviderAdapter → BlueMinds
  *
  * ENVIRONMENT GATE:
- *   This test is skipped automatically when BLUEMINDS_API_KEY or
- *   BLUEMINDS_TEST_MODEL are absent. The live test MUST NOT break
- *   the rest of the test suite when credentials are unavailable or
- *   when BlueMinds experiences service degradation.
+ *   This test is skipped automatically when RUN_LIVE_PROVIDER_TESTS is not
+ *   exactly "true", or when BLUEMINDS_API_KEY or BLUEMINDS_TEST_MODEL are
+ *   absent. The live test MUST NOT break the rest of the test suite when
+ *   credentials are unavailable or when BlueMinds experiences service
+ *   degradation.
  *
  * SECURITY:
  *   API keys are never logged or printed. Only the sanitized model
@@ -31,7 +32,11 @@ import type { ExecutionPlan } from "@/lib/routing/execution-plan";
 const BLUEMINDS_API_KEY = process.env.BLUEMINDS_API_KEY;
 const BLUEMINDS_TEST_MODEL = process.env.BLUEMINDS_TEST_MODEL;
 
+// API credit protection: live provider requests require explicit opt-in.
+const RUN_LIVE = process.env.RUN_LIVE_PROVIDER_TESTS === "true";
+
 const canRunLive =
+  RUN_LIVE &&
   typeof BLUEMINDS_API_KEY === "string" && BLUEMINDS_API_KEY.length > 0 &&
   typeof BLUEMINDS_TEST_MODEL === "string" && BLUEMINDS_TEST_MODEL.length > 0;
 
@@ -147,7 +152,7 @@ describe.skipIf(!canRunLive)("Orchestrator — Real Integration (BlueMinds)", ()
 // ─────────────────────────────────────────────────────
 
 describe.skipIf(canRunLive)("Orchestrator — Real Integration (skipped)", () => {
-  it("skips when BLUEMINDS_API_KEY or BLUEMINDS_TEST_MODEL is not set", () => {
+  it("skips when live testing is not enabled or BLUEMINDS credentials are not set", () => {
     expect(canRunLive).toBe(false);
   });
 });

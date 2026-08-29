@@ -3,11 +3,14 @@
  *
  * Phase 8 / Step 2 — Direct Provider Execution Activation
  *
- * This test only runs when BOTH environment variables are set:
- *   ANTHROPIC_API_KEY     — a valid Anthropic API key
- *   ANTHROPIC_TEST_MODEL  — an inexpensive model identifier
+ * This test only runs when ALL of the following are configured:
+ *   RUN_LIVE_PROVIDER_TESTS="true"  — explicit live-test opt-in
+ *                                     (API credit protection: prevents the
+ *                                     full suite from spending real credits)
+ *   ANTHROPIC_API_KEY               — a valid Anthropic API key
+ *   ANTHROPIC_TEST_MODEL            — an inexpensive model identifier
  *
- * When either is absent, the test is cleanly skipped.
+ * When any is absent, the test is cleanly skipped.
  *
  * The test makes ONE inexpensive request through the EXISTING
  * AnthropicExecutionAdapter to verify:
@@ -22,7 +25,11 @@ import { AnthropicExecutionAdapter } from "@/lib/execution/providers/anthropic";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_TEST_MODEL = process.env.ANTHROPIC_TEST_MODEL;
 
+// API credit protection: live provider requests require explicit opt-in.
+const RUN_LIVE = process.env.RUN_LIVE_PROVIDER_TESTS === "true";
+
 const canRunLive =
+  RUN_LIVE &&
   typeof ANTHROPIC_API_KEY === "string" &&
   ANTHROPIC_API_KEY.length > 0 &&
   typeof ANTHROPIC_TEST_MODEL === "string" &&
@@ -115,15 +122,17 @@ describe.skipIf(!canRunLive)("Anthropic — Real Integration", () => {
 });
 
 describe("Anthropic — Integration Skip", () => {
-  it("reports skip reason when credentials are absent", () => {
+  it("reports skip reason when live testing is not enabled", () => {
     if (!canRunLive) {
       // This test documents WHY the integration test was skipped
-      const reason = !ANTHROPIC_API_KEY
+      const reason = !RUN_LIVE
+        ? 'RUN_LIVE_PROVIDER_TESTS is not "true"'
+        : !ANTHROPIC_API_KEY
         ? "ANTHROPIC_API_KEY not set"
         : "ANTHROPIC_TEST_MODEL not set";
       expect(reason).toBeTruthy();
     } else {
-      // If credentials ARE available, this test is a no-op
+      // If live testing IS enabled, this test is a no-op
       expect(true).toBe(true);
     }
   });

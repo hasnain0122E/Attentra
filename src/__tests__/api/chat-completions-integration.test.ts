@@ -14,9 +14,10 @@
  *     → normalized API response
  *
  * ENVIRONMENT GATE:
- *   Skips automatically when BLUEMINDS_API_KEY, BLUEMINDS_TEST_MODEL,
- *   or DATABASE_URL are absent. External service failures (e.g., 504)
- *   are logged as warnings rather than failing the suite.
+ *   Skips automatically when RUN_LIVE_PROVIDER_TESTS is not exactly "true",
+ *   or when BLUEMINDS_API_KEY, BLUEMINDS_TEST_MODEL, or DATABASE_URL are
+ *   absent. External service failures (e.g., 504) are logged as warnings
+ *   rather than failing the suite.
  */
 
 import { describe, it, expect } from "vitest";
@@ -30,7 +31,11 @@ const BLUEMINDS_API_KEY = process.env.BLUEMINDS_API_KEY;
 const BLUEMINDS_TEST_MODEL = process.env.BLUEMINDS_TEST_MODEL;
 const DATABASE_URL = process.env.DATABASE_URL;
 
+// API credit protection: live provider requests require explicit opt-in.
+const RUN_LIVE = process.env.RUN_LIVE_PROVIDER_TESTS === "true";
+
 const canRunLive =
+  RUN_LIVE &&
   typeof BLUEMINDS_API_KEY === "string" &&
   BLUEMINDS_API_KEY.length > 0 &&
   typeof BLUEMINDS_TEST_MODEL === "string" &&
@@ -120,7 +125,7 @@ describe.skipIf(!canRunLive)(
 describe.skipIf(canRunLive)(
   "Chat Completions API — Integration (skipped)",
   () => {
-    it("skips when credentials or database are not available", () => {
+    it("skips when live testing is not enabled or credentials/database are not available", () => {
       expect(canRunLive).toBe(false);
     });
   }

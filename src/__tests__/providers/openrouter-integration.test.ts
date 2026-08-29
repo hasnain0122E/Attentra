@@ -3,11 +3,14 @@
  *
  * Phase 8 / Step 1 — OpenRouter Provider Adapter
  *
- * This test only runs when BOTH environment variables are set:
- *   OPENROUTER_API_KEY     — a valid OpenRouter API key
- *   OPENROUTER_TEST_MODEL  — an inexpensive model identifier
+ * This test only runs when ALL of the following are configured:
+ *   RUN_LIVE_PROVIDER_TESTS="true"  — explicit live-test opt-in
+ *                                     (API credit protection: prevents the
+ *                                     full suite from spending real credits)
+ *   OPENROUTER_API_KEY              — a valid OpenRouter API key
+ *   OPENROUTER_TEST_MODEL           — an inexpensive model identifier
  *
- * When either is absent, the test is cleanly skipped.
+ * When any is absent, the test is cleanly skipped.
  *
  * The test makes ONE inexpensive request to verify:
  *   - The request reaches OpenRouter
@@ -22,7 +25,11 @@ import { OpenRouterExecutionAdapter } from "@/lib/execution/providers/openrouter
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_TEST_MODEL = process.env.OPENROUTER_TEST_MODEL;
 
+// API credit protection: live provider requests require explicit opt-in.
+const RUN_LIVE = process.env.RUN_LIVE_PROVIDER_TESTS === "true";
+
 const canRunLive =
+  RUN_LIVE &&
   typeof OPENROUTER_API_KEY === "string" &&
   OPENROUTER_API_KEY.length > 0 &&
   typeof OPENROUTER_TEST_MODEL === "string" &&
@@ -116,15 +123,17 @@ describe.skipIf(!canRunLive)("OpenRouter — Real Integration", () => {
 });
 
 describe("OpenRouter — Integration Skip", () => {
-  it("reports skip reason when credentials are absent", () => {
+  it("reports skip reason when live testing is not enabled", () => {
     if (!canRunLive) {
       // This test documents WHY the integration test was skipped
-      const reason = !OPENROUTER_API_KEY
+      const reason = !RUN_LIVE
+        ? 'RUN_LIVE_PROVIDER_TESTS is not "true"'
+        : !OPENROUTER_API_KEY
         ? "OPENROUTER_API_KEY not set"
         : "OPENROUTER_TEST_MODEL not set";
       expect(reason).toBeTruthy();
     } else {
-      // If credentials ARE available, this test is a no-op
+      // If live testing IS enabled, this test is a no-op
       expect(true).toBe(true);
     }
   });

@@ -219,7 +219,7 @@ describe("Anthropic Execution Adapter", () => {
       new Anthropic.APIError(
         401,
         undefined,
-        "invalid x-api-key: sk-abc123def456ghi789jkl012",
+        "invalid x-api-key: MOCK_API_KEY",
         undefined
       )
     );
@@ -228,7 +228,7 @@ describe("Anthropic Execution Adapter", () => {
     const result = await adapter.execute(makeRequest());
 
     const serialized = JSON.stringify(result);
-    expect(serialized).not.toContain("sk-abc123def456ghi789jkl012");
+    expect(serialized).not.toContain("MOCK_API_KEY");
     expect(serialized).not.toContain(MOCK_API_KEY);
     expect(result.error?.message).toContain("[REDACTED]");
   });

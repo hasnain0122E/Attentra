@@ -3,11 +3,14 @@
  *
  * Phase 7 / Step 2 — Provider Execution Abstraction + BlueMinds Adapter
  *
- * This test only runs when BOTH environment variables are set:
- *   BLUEMINDS_API_KEY     — a valid BlueMinds API key
- *   BLUEMINDS_TEST_MODEL  — a supported inexpensive model ID
+ * This test only runs when ALL of the following are configured:
+ *   RUN_LIVE_PROVIDER_TESTS="true"  — explicit live-test opt-in
+ *                                     (API credit protection: prevents the
+ *                                     full suite from spending real credits)
+ *   BLUEMINDS_API_KEY               — a valid BlueMinds API key
+ *   BLUEMINDS_TEST_MODEL            — a supported inexpensive model ID
  *
- * When either is absent, the test is cleanly skipped.
+ * When any is absent, the test is cleanly skipped.
  *
  * The test makes ONE inexpensive request to verify:
  *   - The request reaches BlueMinds
@@ -22,7 +25,11 @@ import { BlueMindsExecutionAdapter } from "@/lib/execution/providers/blueminds";
 const BLUEMINDS_API_KEY = process.env.BLUEMINDS_API_KEY;
 const BLUEMINDS_TEST_MODEL = process.env.BLUEMINDS_TEST_MODEL;
 
+// API credit protection: live provider requests require explicit opt-in.
+const RUN_LIVE = process.env.RUN_LIVE_PROVIDER_TESTS === "true";
+
 const canRunLive =
+  RUN_LIVE &&
   typeof BLUEMINDS_API_KEY === "string" &&
   BLUEMINDS_API_KEY.length > 0 &&
   typeof BLUEMINDS_TEST_MODEL === "string" &&
@@ -98,15 +105,17 @@ describe.skipIf(!canRunLive)("BlueMinds — Real Integration", () => {
 });
 
 describe("BlueMinds — Integration Skip", () => {
-  it("reports skip reason when credentials are absent", () => {
+  it("reports skip reason when live testing is not enabled", () => {
     if (!canRunLive) {
       // This test documents WHY the integration test was skipped
-      const reason = !BLUEMINDS_API_KEY
+      const reason = !RUN_LIVE
+        ? 'RUN_LIVE_PROVIDER_TESTS is not "true"'
+        : !BLUEMINDS_API_KEY
         ? "BLUEMINDS_API_KEY not set"
         : "BLUEMINDS_TEST_MODEL not set";
       expect(reason).toBeTruthy();
     } else {
-      // If credentials ARE available, this test is a no-op
+      // If live testing IS enabled, this test is a no-op
       expect(true).toBe(true);
     }
   });
