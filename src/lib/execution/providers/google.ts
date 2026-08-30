@@ -21,14 +21,23 @@ import { BaseExecutionAdapter } from "../types";
  * @returns  BaseExecutionAdapter wrapping the Phase 4 GoogleProvider
  */
 export function createGoogleAdapter(): BaseExecutionAdapter {
-  return new BaseExecutionAdapter(new GoogleProvider());
+  return new GoogleExecutionAdapter();
 }
 
 /**
  * Google execution adapter class (for direct instantiation in tests).
+ *
+ * Model support is decided by the dynamic model catalog and the routing
+ * engine (Phase 8): candidates are loaded from the database per provider,
+ * so the adapter executes any model the router selects for this provider
+ * and forwards the provider-native identifier to the underlying provider.
  */
 export class GoogleExecutionAdapter extends BaseExecutionAdapter {
   constructor() {
     super(new GoogleProvider());
+  }
+
+  supports(_modelId: string): boolean {
+    return true;
   }
 }

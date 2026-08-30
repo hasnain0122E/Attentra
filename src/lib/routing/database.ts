@@ -103,7 +103,10 @@ export async function loadRoutingCandidates(): Promise<CandidateLoadResult> {
 
       candidates.push({
         modelId: model.id,
-        providerId: model.provider.id,
+        // The execution layer's ProviderRegistry resolves adapters by the
+        // LOGICAL provider name ("openai"/"anthropic"/"google"), matching
+        // the ModelCandidate.providerId contract — not the Prisma row id.
+        providerId: model.provider.name,
         providerName: model.provider.name,
         modelIdentifier: model.modelIdentifier,
         displayName: model.displayName,

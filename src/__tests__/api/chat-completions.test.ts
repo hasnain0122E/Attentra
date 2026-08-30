@@ -38,9 +38,7 @@ vi.mock("@/lib/routing", () => ({
 
 vi.mock("@/lib/execution", async () => {
   const actual =
-    await vi.importActual<typeof import("@/lib/execution")>(
-      "@/lib/execution"
-    );
+    await vi.importActual<typeof import("@/lib/execution")>("@/lib/execution");
   // Use a class mock so `new ExecutionOrchestrator()` works correctly
   class MockOrchestrator {
     execute(...args: unknown[]) {
@@ -124,7 +122,7 @@ describe("Chat Completions API — Validation", () => {
         method: "POST",
         headers: { "content-type": "text/plain" },
         body: "not json",
-      }
+      },
     );
     const res = await POST(req);
     expect(res.status).toBe(400);
@@ -259,8 +257,26 @@ describe("Chat Completions API — Execution", () => {
       latencyMs: 420,
       actualCost: undefined,
       timestamp: "2026-01-01T00:00:00.000Z",
-      executionAttempts: [],
+      executionAttempts: [
+        {
+          attemptNumber: 1,
+          providerId: "blueminds",
+          modelId: "mock-model-1",
+          modelIdentifier: "mock-executed-id",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:00.420Z",
+          latencyMs: 420,
+          success: true,
+          usage: {
+            inputTokens: 10,
+            outputTokens: 5,
+            totalTokens: 15,
+          },
+        },
+      ],
+      attempts: 1,
     });
+
 
     const req = makeRequest({
       messages: VALID_MESSAGES,
@@ -273,18 +289,34 @@ describe("Chat Completions API — Execution", () => {
     expect(data.success).toBe(true);
     expect(data.requestId).toBe("success-test");
     expect(data.content).toBe("Hello from Attentra!");
-    expect(data.model).toBe("mock-model-1");
-    expect(data.usage).toEqual({
+
+    const routing = data.routing as Record<string, unknown>;
+    expect(routing.selectedModelId).toBe("mock-model");
+    expect(routing.selectedModelIdentifier).toBe("mock-id");
+    expect(routing.selectedModelDisplayName).toBe("Mock Model");
+    expect(routing.selectedProvider).toBe("mock");
+    expect(routing.reason).toBe("Test");
+    expect(routing.taskType).toBe("GENERAL");
+    expect(routing.complexity).toBe("LOW");
+    expect(routing.projectedCost).toBe(0.001);
+
+    const execution = data.execution as Record<string, unknown>;
+    expect(execution.modelId).toBe("mock-model-1");
+    expect(execution.provider).toBe("blueminds");
+    expect(execution.fallbackUsed).toBe(false);
+
+    expect(execution.usage).toEqual({
       inputTokens: 10,
       outputTokens: 5,
       totalTokens: 15,
     });
-    expect(data.latencyMs).toBe(420);
-    expect(data.timestamp).toBeDefined();
-    // actualCost is undefined → should be omitted or null
-    expect(data.actualCost).toBeUndefined();
-  });
 
+    expect(execution.latencyMs).toBe(420);
+    expect(execution.actualCost).toBeUndefined();
+
+    expect(data.timestamp).toBeDefined();
+    expect(execution.modelIdentifier).toBe("mock-executed-id");
+  });
   // ───────────────────────────────────────────────────
   // 9. EXECUTION FAILURE
   // ───────────────────────────────────────────────────
@@ -371,8 +403,7 @@ describe("Chat Completions API — Security", () => {
       success: false,
       error: {
         code: "AUTHENTICATION",
-        message:
-          "Unauthorized: Bearer sk-1234567890abcdefghijklmnopqrst",
+        message: "Unauthorized: Bearer sk-1234567890abcdefghijklmnopqrst",
         retryable: false,
       },
       latencyMs: 100,
@@ -405,9 +436,9 @@ describe("Chat Completions API — Architecture", () => {
       "v1",
       "chat",
       "completions",
-      "route.ts"
+      "route.ts",
     ),
-    "utf-8"
+    "utf-8",
   );
 
   it("does not import any provider SDK", () => {

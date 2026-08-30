@@ -21,14 +21,23 @@ import { BaseExecutionAdapter } from "../types";
  * @returns  BaseExecutionAdapter wrapping the Phase 4 OpenAIProvider
  */
 export function createOpenAIAdapter(): BaseExecutionAdapter {
-  return new BaseExecutionAdapter(new OpenAIProvider());
+  return new OpenAIExecutionAdapter();
 }
 
 /**
  * OpenAI execution adapter class (for direct instantiation in tests).
+ *
+ * Model support is decided by the dynamic model catalog and the routing
+ * engine (Phase 8): candidates are loaded from the database per provider,
+ * so the adapter executes any model the router selects for this provider
+ * and forwards the provider-native identifier to the underlying provider.
  */
 export class OpenAIExecutionAdapter extends BaseExecutionAdapter {
   constructor() {
     super(new OpenAIProvider());
+  }
+
+  supports(_modelId: string): boolean {
+    return true;
   }
 }

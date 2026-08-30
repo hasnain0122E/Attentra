@@ -323,7 +323,10 @@ describe("Non-retryable failures stop execution", () => {
     expect(result.executionAttempts[0].error?.code).toBe("CONTEXT_LENGTH");
   });
 
-  it("MODEL_UNAVAILABLE failure stops execution (non-retryable)", async () => {
+  it("MODEL_UNAVAILABLE is target-specific — falls through to the next fallback target", async () => {
+    // A model that is retired/restricted (e.g. listed but closed to new
+    // users) must not abort the whole request: the fallback chain is a
+    // DIFFERENT model, usually on another provider, and may still serve.
     const fallback = makeFallbackTarget(0, "mock-fb");
     const plan = makePlan({ fallbacks: [fallback] });
 
@@ -340,9 +343,31 @@ describe("Non-retryable failures stop execution", () => {
 
     const result = await new ExecutionOrchestrator(registry).execute(plan, MESSAGES);
 
-    expect(result.success).toBe(false);
-    expect(result.executionAttempts).toHaveLength(1);
+    expect(result.success).toBe(true);
+    expect(result.executionAttempts).toHaveLength(2);
+    // The error itself stays non-retryable (never re-attempt THAT model)
+    expect(result.executionAttempts[0].error?.code).toBe("MODEL_UNAVAILABLE");
     expect(result.executionAttempts[0].error?.retryable).toBe(false);
+    expect(result.fallback?.used).toBe(true);
+    expect(result.fallback?.fallbackModelId).toBe("mock-model-fallback-1");
+  });
+
+  it("MODEL_UNAVAILABLE on every target fails after exhausting the chain", async () => {
+    const plan = makePlan({
+      fallbacks: [makeFallbackTarget(0, "mock-fb")],
+    });
+
+    const registry = buildRegistry([
+      { providerId: "mock", behavior: "model_unavailable" },
+      { providerId: "mock-fb", behavior: "model_unavailable" },
+    ]);
+
+    const result = await new ExecutionOrchestrator(registry).execute(plan, MESSAGES);
+
+    expect(result.success).toBe(false);
+    expect(result.executionAttempts).toHaveLength(2);
+    expect(result.error?.code).toBe("MODEL_UNAVAILABLE");
+    expect(result.fallback?.used).toBe(true);
   });
 });
 
@@ -499,6 +524,115 @@ describe("Execution plan validation", () => {
     expect(result.error?.code).toBe("INVALID_REQUEST");
     expect(result.executionAttempts).toHaveLength(0);
   });
+
+  it("actualCost uses the successful fallback model pricing, not the primary model pricing", async () => {
+  const primaryTarget = makeTarget({
+    entryId: "primary",
+    modelId: "primary-model",
+    providerId: "primary-provider",
+    modelIdentifier: "primary-model",
+  });
+
+  const fallbackTarget = makeTarget({
+    entryId: "fallback-1",
+    modelId: "fallback-model",
+    providerId: "fallback-provider",
+    modelIdentifier: "fallback-model",
+  });
+
+  const plan = makePlan({
+    primary: primaryTarget,
+    fallbacks: [fallbackTarget],
+  });
+
+  const inner = new ExecutionAdapterRegistry();
+  const registry = new ProviderRegistry(inner);
+
+  const primary = new MockProviderAdapter({
+    behavior: "model_unavailable",
+  });
+
+  Object.defineProperty(primary, "providerId", {
+    value: "primary-provider",
+    writable: false,
+  });
+
+  registry.register(primary);
+
+  const fallback = new MockProviderAdapter({
+    behavior: "success",
+  });
+
+  Object.defineProperty(fallback, "providerId", {
+    value: "fallback-provider",
+    writable: false,
+  });
+
+  registry.register(fallback);
+
+  const mockPrisma = {
+    model: {
+      findUnique: vi.fn().mockImplementation(
+        ({ where }: { where: { id: string } }) => {
+          if (where.id === "primary-model") {
+            return Promise.resolve({
+              inputPricePer1k: "99.00000000",
+              outputPricePer1k: "99.00000000",
+            });
+          }
+
+          if (where.id === "fallback-model") {
+            return Promise.resolve({
+              inputPricePer1k: "0.00100000",
+              outputPricePer1k: "0.00200000",
+            });
+          }
+
+          return Promise.resolve(null);
+        }
+      ),
+    },
+  };
+
+  const result = await new ExecutionOrchestrator(registry).execute(
+    plan,
+    MESSAGES,
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      prisma: mockPrisma as any,
+    }
+  );
+
+  expect(result.success).toBe(true);
+  expect(result.fallback?.used).toBe(true);
+
+  // Most important assertion:
+  // Pricing lookup must happen for the model that actually succeeded.
+  expect(mockPrisma.model.findUnique).toHaveBeenCalledWith({
+    where: { id: "fallback-model" },
+    select: {
+      inputPricePer1k: true,
+      outputPricePer1k: true,
+    },
+  });
+
+  expect(mockPrisma.model.findUnique).not.toHaveBeenCalledWith({
+    where: { id: "primary-model" },
+    select: {
+      inputPricePer1k: true,
+      outputPricePer1k: true,
+    },
+  });
+
+  expect(result.actualCost).toBeDefined();
+  expect(result.executionAttempts).toHaveLength(2);
+
+  expect(result.executionAttempts[0].actualCost).toBeUndefined();
+  expect(result.executionAttempts[1].actualCost).toBe(result.actualCost);
+
+  expect(result.modelId).toBe("fallback-model");
+  expect(result.providerId).toBe("fallback-provider");
+});
 });
 
 // ─────────────────────────────────────────────────────

@@ -102,26 +102,28 @@ describe("Provider Adapter Contract", () => {
     expect(ids.size).toBe(4);
   });
 
-  it("OpenAI adapter supports its known models", () => {
+  it("OpenAI adapter supports catalog-selected models dynamically", () => {
     const adapter = createOpenAIAdapter();
+    // Model support is decided by the dynamic catalog + routing engine
+    // (Phase 8); the adapter executes any model routed to this provider,
+    // including newly discovered models absent from any static list.
     expect(adapter.supports("openai-gpt-4o")).toBe(true);
-    expect(adapter.supports("openai-gpt-4o-mini")).toBe(true);
-    expect(adapter.supports("openai-gpt-4.1")).toBe(true);
-    expect(adapter.supports("nonexistent-model")).toBe(false);
+    expect(adapter.supports("db-model-cuid-1")).toBe(true);
+    expect(adapter.supports("brand-new-catalog-model")).toBe(true);
   });
 
-  it("Anthropic adapter supports its known models", () => {
+  it("Anthropic adapter supports catalog-selected models dynamically", () => {
     const adapter = createAnthropicAdapter();
     expect(adapter.supports("anthropic-claude-sonnet-4")).toBe(true);
-    expect(adapter.supports("anthropic-claude-opus-4")).toBe(true);
-    expect(adapter.supports("nonexistent-model")).toBe(false);
+    expect(adapter.supports("db-model-cuid-2")).toBe(true);
+    expect(adapter.supports("brand-new-catalog-model")).toBe(true);
   });
 
-  it("Google adapter supports its known models", () => {
+  it("Google adapter supports catalog-selected models dynamically", () => {
     const adapter = createGoogleAdapter();
     expect(adapter.supports("google-gemini-2.5-flash")).toBe(true);
-    expect(adapter.supports("google-gemini-2.5-pro")).toBe(true);
-    expect(adapter.supports("nonexistent-model")).toBe(false);
+    expect(adapter.supports("db-model-cuid-3")).toBe(true);
+    expect(adapter.supports("brand-new-catalog-model")).toBe(true);
   });
 
   it("supports() behavior is deterministic", () => {

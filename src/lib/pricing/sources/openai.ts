@@ -7,9 +7,12 @@
  *
  * Architecture:
  *   1. Fetch the official pricing page as markdown
- *   2. Parse the standard + batch pricing tables
- *   3. Extract per-model pricing and normalize to per-1K tokens
- *   4. Fall back to static known pricing if fetch/parse fails
+ *   2. Parse the standard + batch pricing tables plus the
+ *      specialized-models table (every eligible row)
+ *   3. Filter rows through the shared catalog chat-family rules
+ *      (Phase 8 Step 3 — eligibility lives in exactly one place)
+ *   4. Normalize to per-1K tokens with family-profile metadata
+ *   5. Fall back to static known pricing if fetch/parse fails
  *
  * Prices on the page are per 1M tokens; we convert to per 1K tokens.
  */
@@ -23,17 +26,18 @@ import {
   parseMarkdownTables,
   extractDollarAmount,
   per1MtoPer1K,
-  findRowByExactFirstCell,
 } from "./markdown-parser";
+import { isChatFamilyModelId, classifyModelProfile } from "@/lib/catalog/profiles";
 
 const SOURCE_URL = "https://platform.openai.com/docs/pricing";
 const MD_URL = "https://platform.openai.com/docs/pricing.md";
 const PROVIDER_NAME = "openai";
 
 /**
- * Models we actively track. The parser looks up each modelIdentifier
- * in the official pricing table. If a model is not found in the table,
- * its KNOWN_MODELS entry is used as fallback.
+ * Curated entries for the models tracked since Phase 5. The parser now
+ * recognizes every eligible chat model in the official pricing tables;
+ * these entries supply hand-curated metadata when an identifier matches
+ * and serve as the static fallback when fetch/parse fails.
  */
 const KNOWN_MODELS: NormalizedModelPricing[] = [
   {
@@ -119,15 +123,53 @@ const KNOWN_MODELS: NormalizedModelPricing[] = [
 ];
 
 /**
+ * Normalize a pricing-table model cell to a bare model identifier.
+ * Strips qualifiers like " (<272K context length)" that OpenAI appends
+ * to model names in the pricing tables.
+ */
+function normalizeModelCell(cell: string): string {
+  return cell.split(" (")[0].trim().toLowerCase();
+}
+
+/**
+ * Build the non-price metadata for a model recognized in the pricing
+ * tables. Tracked KNOWN_MODELS entries win (hand-curated capabilities);
+ * other models get a conservative family profile. Prices are always
+ * overridden by the caller with live table values.
+ */
+function openAIBaseEntry(modelId: string): NormalizedModelPricing {
+  const known = KNOWN_MODELS.find((m) => m.modelIdentifier === modelId);
+  if (known) return known;
+
+  const profile = classifyModelProfile("openai", modelId);
+  return {
+    modelIdentifier: modelId,
+    displayName: profile.displayName,
+    capabilities: profile.capabilities,
+    tier: profile.tier,
+    contextWindow: profile.contextWindow,
+    expectedLatencyMs: profile.expectedLatencyMs,
+    inputPricePer1k: 0,
+    outputPricePer1k: 0,
+    active: true,
+  };
+}
+
+/**
  * Parse the OpenAI pricing markdown and extract model pricing.
- * Returns a map of modelId → pricing data.
+ *
+ * Recognizes every chat / text-generation model listed in the standard,
+ * batch and specialized pricing tables — new models become priced
+ * routing candidates without code changes.
  */
 function parseOpenAIPricing(content: string): NormalizedModelPricing[] {
   const tables = parseMarkdownTables(content);
 
   // The pricing page has multiple tables with the same column structure.
   // Standard pricing is the first table with "Model" in headers.
-  // Batch pricing is the second such table.
+  // Batch pricing is the second such table. (Later matches are Flex,
+  // Fast, Cyber, realtime/audio, image, video, transcription and
+  // fine-tuning tables — intentionally not merged into standard prices.)
   const modelTables = tables.filter(
     (t) => t.headers.length >= 5 && t.headers[0].toLowerCase().includes("model")
   );
@@ -139,45 +181,95 @@ function parseOpenAIPricing(content: string): NormalizedModelPricing[] {
   const standardTable = modelTables[0];
   const batchTable = modelTables.length > 1 ? modelTables[1] : null;
 
-  // Column layout (OpenAI pricing tables):
-  // 0: Model | 1: Short context input | 2: cached input | 3: cache writes | 4: output
-  const results: NormalizedModelPricing[] = [];
-
-  for (const known of KNOWN_MODELS) {
-    const row = findRowByExactFirstCell(standardTable, known.modelIdentifier);
-
-    if (!row) {
-      // Model not found in live table — use fallback
-      results.push(known);
-      continue;
-    }
-
-    const inputPer1M = extractDollarAmount(row[1]);
-    const cachedInputPer1M = extractDollarAmount(row[2]);
-    const outputPer1M = extractDollarAmount(row[4]);
-
-    // Batch pricing (same column layout)
-    let batchInputPer1M: number | null = null;
-    let batchOutputPer1M: number | null = null;
-    if (batchTable) {
-      const batchRow = findRowByExactFirstCell(batchTable, known.modelIdentifier);
-      if (batchRow) {
-        batchInputPer1M = extractDollarAmount(batchRow[1]);
-        batchOutputPer1M = extractDollarAmount(batchRow[4]);
+  // Index batch rows by normalized model id so qualifier-stripped ids match.
+  const batchRows = new Map<string, string[]>();
+  if (batchTable) {
+    for (const row of batchTable.rows) {
+      const id = normalizeModelCell(row[0] ?? "");
+      if (id && !batchRows.has(id)) {
+        batchRows.set(id, row);
       }
     }
+  }
+
+  const results: NormalizedModelPricing[] = [];
+  const seen = new Set<string>();
+
+  // Column layout (OpenAI pricing tables):
+  // 0: Model | 1: Short context input | 2: cached input | 3: cache writes | 4: output
+  for (const row of standardTable.rows) {
+    const modelId = normalizeModelCell(row[0] ?? "");
+    if (!modelId || seen.has(modelId)) continue;
+    // Only chat / text-generation families may receive pricing.
+    if (!isChatFamilyModelId("openai", modelId)) continue;
+
+    const inputPer1M = extractDollarAmount(row[1] ?? "");
+    const cachedInputPer1M = extractDollarAmount(row[2] ?? "");
+    const outputPer1M = extractDollarAmount(row[4] ?? "");
+
+    // Never invent prices — skip rows without usable input/output prices.
+    if (inputPer1M === null || outputPer1M === null) continue;
+
+    const batchRow = batchRows.get(modelId) ?? null;
+    const batchInputPer1M = batchRow ? extractDollarAmount(batchRow[1] ?? "") : null;
+    const batchOutputPer1M = batchRow ? extractDollarAmount(batchRow[4] ?? "") : null;
+
+    const base = openAIBaseEntry(modelId);
 
     results.push({
-      ...known,
-      inputPricePer1k: inputPer1M !== null ? per1MtoPer1K(inputPer1M) : known.inputPricePer1k,
-      outputPricePer1k: outputPer1M !== null ? per1MtoPer1K(outputPer1M) : known.outputPricePer1k,
+      ...base,
+      inputPricePer1k: per1MtoPer1K(inputPer1M),
+      outputPricePer1k: per1MtoPer1K(outputPer1M),
       cachedInputPricePer1k:
-        cachedInputPer1M !== null ? per1MtoPer1K(cachedInputPer1M) : known.cachedInputPricePer1k,
+        cachedInputPer1M !== null ? per1MtoPer1K(cachedInputPer1M) : base.cachedInputPricePer1k,
       batchInputPricePer1k:
-        batchInputPer1M !== null ? per1MtoPer1K(batchInputPer1M) : known.batchInputPricePer1k,
+        batchInputPer1M !== null ? per1MtoPer1K(batchInputPer1M) : base.batchInputPricePer1k,
       batchOutputPricePer1k:
-        batchOutputPer1M !== null ? per1MtoPer1K(batchOutputPer1M) : known.batchOutputPricePer1k,
+        batchOutputPer1M !== null ? per1MtoPer1K(batchOutputPer1M) : base.batchOutputPricePer1k,
     });
+    seen.add(modelId);
+  }
+
+  // Specialized models table: | Category | Model | Input | Cached input | Output |
+  // Recognizes chat models listed outside the main tables (e.g. chat-latest).
+  const specializedTable = tables.find(
+    (t) =>
+      t.headers[0]?.toLowerCase() === "category" &&
+      t.headers.some((h) => h.toLowerCase() === "model")
+  );
+
+  if (specializedTable) {
+    for (const row of specializedTable.rows) {
+      const modelId = normalizeModelCell(row[1] ?? "");
+      if (!modelId || seen.has(modelId)) continue;
+      if (!isChatFamilyModelId("openai", modelId)) continue;
+
+      const inputPer1M = extractDollarAmount(row[2] ?? "");
+      const cachedInputPer1M = extractDollarAmount(row[3] ?? "");
+      const outputPer1M = extractDollarAmount(row[4] ?? "");
+
+      if (inputPer1M === null || outputPer1M === null) continue;
+
+      const base = openAIBaseEntry(modelId);
+
+      results.push({
+        ...base,
+        inputPricePer1k: per1MtoPer1K(inputPer1M),
+        outputPricePer1k: per1MtoPer1K(outputPer1M),
+        cachedInputPricePer1k:
+          cachedInputPer1M !== null ? per1MtoPer1K(cachedInputPer1M) : base.cachedInputPricePer1k,
+      });
+      seen.add(modelId);
+    }
+  }
+
+  // Tracked models absent from the live tables keep their static fallback
+  // entry so price history is never destroyed by a page redesign.
+  for (const known of KNOWN_MODELS) {
+    if (!seen.has(known.modelIdentifier)) {
+      results.push(known);
+      seen.add(known.modelIdentifier);
+    }
   }
 
   return results;

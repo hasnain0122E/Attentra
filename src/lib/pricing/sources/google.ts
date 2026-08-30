@@ -3,18 +3,26 @@
  *
  * Fetches and normalizes pricing from Google's official pricing page.
  * Official source: https://ai.google.dev/gemini-api/docs/pricing
- * Markdown version: https://ai.google.dev/gemini-api/docs/pricing.md
+ * Markdown version: https://ai.google.dev/gemini-api/docs/pricing.md?hl=en
  *
  * Architecture:
- *   1. Fetch the official pricing page as markdown
- *   2. Parse per-model sections (each headed by *model-id*)
- *   3. Extract Standard + Batch pricing tables within each section
- *   4. Normalize to per-1K tokens
- *   5. Fall back to static known pricing if fetch/parse fails
+ *   1. Fetch the official pricing page (served as HTML today; the
+ *      legacy *model-id* markdown format is still supported as fallback)
+ *   2. Parse per-model sections — HTML sections are headed by
+ *      <h2 id="model-id">, markdown sections by *model-id*
+ *   3. Extract the Standard + Batch pricing tables within each section
+ *      (identified by their h3 "Standard"/"Batch" labels, with a
+ *      positional fallback for bare tables)
+ *   4. Keep only chat/text-generation families (shared catalog
+ *      eligibility rules — TTS, image, live, robotics, embedding and
+ *      tool sections never enter the routing pool)
+ *   5. Normalize to per-1K tokens
+ *   6. Fall back to static known pricing if fetch/parse fails
  *
  * Google's format differs from OpenAI/Anthropic: each model has its
- * own section with 2-column tables (Free Tier / Paid Tier).
- * Prices on the page are per 1M tokens.
+ * own section with 3-column tables (label / Free Tier / Paid Tier).
+ * Prices on the page are per 1M tokens; tiered and dated-transition
+ * cells are read at their current (first-listed) rate.
  */
 
 import type {
@@ -27,14 +35,19 @@ import {
   extractDollarAmount,
   per1MtoPer1K,
 } from "./markdown-parser";
+import {
+  isChatFamilyModelId,
+  classifyModelProfile,
+} from "@/lib/catalog/profiles";
 
 const SOURCE_URL = "https://ai.google.dev/pricing";
-const MD_URL = "https://ai.google.dev/gemini-api/docs/pricing.md";
+const MD_URL = "https://ai.google.dev/gemini-api/docs/pricing.md?hl=en";
 const PROVIDER_NAME = "google";
 
 /**
- * Models we actively track. The parser searches for each modelIdentifier
- * in the markdown content and extracts its Standard/Batch pricing tables.
+ * Models we actively track. Parsed models take precedence; these
+ * entries serve as the static fallback when the pricing page cannot
+ * be fetched or no longer lists the model.
  */
 const KNOWN_MODELS: NormalizedModelPricing[] = [
   {
@@ -84,8 +97,217 @@ const KNOWN_MODELS: NormalizedModelPricing[] = [
   },
 ];
 
+// ─────────────────────────────────────────────────────
+// SHARED TIER-TABLE EXTRACTION
+// ─────────────────────────────────────────────────────
+
 /**
- * Split markdown content into per-model sections.
+ * Prices extracted from one Google pricing tier table (per 1M tokens).
+ * Both the HTML and the legacy markdown tables have 3 columns:
+ * | label | Free Tier | Paid Tier |.
+ */
+interface GoogleTierPrices {
+  input: number;
+  output: number;
+  cache: number | null;
+  freeTierAvailable: boolean;
+}
+
+/**
+ * Extract tier prices from 3-column rows (label, Free Tier, Paid Tier).
+ *
+ * Tiered / dated-transition cells ("$0.75 through December 31, 2026") are
+ * read at their current (first-listed) rate. Returns null when no usable
+ * input+output pair exists (e.g. Gemma's "Not available" columns) — the
+ * pricing gate keeps unpriced models non-routable.
+ */
+function extractTierPrices(rows: string[][]): GoogleTierPrices | null {
+  let input: number | null = null;
+  let output: number | null = null;
+  let cache: number | null = null;
+  let freeTierAvailable = false;
+
+  for (const row of rows) {
+    const label = (row[0] ?? "").toLowerCase();
+    const paidCell = row[2] ?? "";
+
+    if (label.startsWith("input price")) {
+      input = extractDollarAmount(paidCell);
+      freeTierAvailable = (row[1] ?? "").toLowerCase().includes("free");
+    } else if (label.startsWith("output price")) {
+      output = extractDollarAmount(paidCell);
+    } else if (label.startsWith("context caching")) {
+      cache = extractDollarAmount(paidCell);
+    }
+  }
+
+  if (input === null || output === null) return null;
+
+  return { input, output, cache, freeTierAvailable };
+}
+
+/** Build the normalized pricing entry for one Google model. */
+function buildGooglePricing(
+  modelId: string,
+  standard: GoogleTierPrices,
+  batch: GoogleTierPrices | null
+): NormalizedModelPricing {
+  const profile = classifyModelProfile("google", modelId);
+
+  return {
+    modelIdentifier: modelId,
+    displayName: profile.displayName,
+    capabilities: profile.capabilities,
+    tier: profile.tier,
+    contextWindow: profile.contextWindow,
+    expectedLatencyMs: profile.expectedLatencyMs,
+    inputPricePer1k: per1MtoPer1K(standard.input),
+    outputPricePer1k: per1MtoPer1K(standard.output),
+    cachedInputPricePer1k:
+      standard.cache !== null ? per1MtoPer1K(standard.cache) : undefined,
+    batchInputPricePer1k: batch ? per1MtoPer1K(batch.input) : undefined,
+    batchOutputPricePer1k: batch ? per1MtoPer1K(batch.output) : undefined,
+    pricingDimensions: standard.freeTierAvailable
+      ? { freeTierAvailable: true }
+      : undefined,
+    active: true,
+  };
+}
+
+// ─────────────────────────────────────────────────────
+// HTML PARSING (current page format)
+// ─────────────────────────────────────────────────────
+
+/** Whether the fetched content is the current HTML page (vs legacy markdown). */
+function looksLikeHtml(content: string): boolean {
+  return /<h2\s+id="[\w.-]+"/.test(content) || content.includes("<table");
+}
+
+/** Strip markup inside a table cell and collapse whitespace. */
+function stripHtml(cell: string): string {
+  return cell
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Data rows of one HTML pricing table (label, Free Tier, Paid Tier).
+ * Header rows (<th> only) are skipped.
+ */
+function extractHtmlRows(tableHtml: string): string[][] {
+  const rows: string[][] = [];
+
+  for (const rowMatch of tableHtml.matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+    const cells = Array.from(
+      rowMatch[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g),
+      (cellMatch) => stripHtml(cellMatch[1])
+    );
+    if (cells.length >= 3) rows.push([cells[0], cells[1], cells[2]]);
+  }
+
+  return rows;
+}
+
+/**
+ * Standard + Batch tables of one model section.
+ *
+ * Tables are identified by their h3 labels ("Standard"/"Batch") when
+ * present; sections with bare tables (no h3 labels) fall back to
+ * positional order — the first pricing table is Standard.
+ */
+function extractHtmlPricingTables(
+  sectionHtml: string
+): { standard: string[][] | null; batch: string[][] | null } {
+  const labeled: Array<{ label: string; rows: string[][] }> = [];
+  const labeledPattern =
+    /<h3[^>]*data-text="([^"]+)"[^>]*>[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/g;
+
+  for (const match of sectionHtml.matchAll(labeledPattern)) {
+    labeled.push({
+      label: stripHtml(match[1]).toLowerCase(),
+      rows: extractHtmlRows(match[2]),
+    });
+  }
+
+  const standard = labeled.find(
+    (t) => t.label === "standard" && t.rows.length > 0
+  );
+  const batch = labeled.find((t) => t.label === "batch" && t.rows.length > 0);
+
+  if (standard || batch) {
+    return {
+      standard: standard ? standard.rows : null,
+      batch: batch ? batch.rows : null,
+    };
+  }
+
+  // Bare tables (no h3 labels): first table is Standard, second is Batch
+  const bare = Array.from(
+    sectionHtml.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g),
+    (tableMatch) => extractHtmlRows(tableMatch[1])
+  ).filter((rows) => rows.length > 0);
+
+  return {
+    standard: bare.length > 0 ? bare[0] : null,
+    batch: bare.length > 1 ? bare[1] : null,
+  };
+}
+
+/** Split the HTML page into per-model sections keyed by their h2 id. */
+function splitHtmlSections(
+  content: string
+): Array<{ id: string; html: string }> {
+  const headings = Array.from(content.matchAll(/<h2\s+id="([\w.-]+)"/g));
+  const sections: Array<{ id: string; html: string }> = [];
+
+  headings.forEach((heading, index) => {
+    const start = heading.index ?? 0;
+    const end =
+      index + 1 < headings.length
+        ? headings[index + 1].index ?? content.length
+        : content.length;
+    sections.push({ id: heading[1], html: content.slice(start, end) });
+  });
+
+  return sections;
+}
+
+/** Parse the current HTML pricing page into per-model pricing. */
+function parseGoogleHtmlPricing(content: string): NormalizedModelPricing[] {
+  const results: NormalizedModelPricing[] = [];
+
+  for (const section of splitHtmlSections(content)) {
+    // Only chat/text-generation families may enter the routing pool —
+    // TTS, image, live, robotics, embedding and tool sections are
+    // skipped by the shared catalog eligibility rules (Phase 8 Step 3).
+    if (!isChatFamilyModelId("google", section.id)) continue;
+
+    const { standard, batch } = extractHtmlPricingTables(section.html);
+    if (!standard) continue;
+
+    const standardPrices = extractTierPrices(standard);
+    if (!standardPrices) continue;
+
+    const batchPrices = batch ? extractTierPrices(batch) : null;
+
+    results.push(buildGooglePricing(section.id, standardPrices, batchPrices));
+  }
+
+  return results;
+}
+
+// ─────────────────────────────────────────────────────
+// LEGACY MARKDOWN PARSING (fallback format)
+// ─────────────────────────────────────────────────────
+
+/**
+ * Split legacy markdown content into per-model sections.
  * Each model section starts with `*model-id*` pattern.
  */
 function splitModelSections(content: string): Map<string, string> {
@@ -119,89 +341,49 @@ function splitModelSections(content: string): Map<string, string> {
 }
 
 /**
- * Extract pricing from a model section.
- * Looks for "### Standard" and "### Batch" subsections,
- * then parses their pricing tables.
+ * Parse the legacy markdown pricing format: per-model sections with
+ * positional Standard/Batch tables (| | Free Tier | Paid Tier |).
  */
-function extractGoogleModelPricing(
-  sectionContent: string,
-  known: NormalizedModelPricing
-): NormalizedModelPricing {
-  const tables = parseMarkdownTables(sectionContent);
+function parseGoogleMarkdownPricing(content: string): NormalizedModelPricing[] {
+  const results: NormalizedModelPricing[] = [];
 
-  // Google tables have format: |  | Free Tier | Paid Tier |
-  // We need to find the table under "### Standard" and "### Batch"
-  // Since we parse tables from the section, the first table is Standard,
-  // the second is Batch.
-  const pricingTables = tables.filter(
-    (t) => t.headers.length >= 3 && t.rows.length > 0
-  );
+  for (const [modelId, sectionContent] of splitModelSections(content)) {
+    if (!isChatFamilyModelId("google", modelId)) continue;
 
-  if (pricingTables.length === 0) return known;
+    const pricingTables = parseMarkdownTables(sectionContent).filter(
+      (t) => t.headers.length >= 3 && t.rows.length > 0
+    );
+    if (pricingTables.length === 0) continue;
 
-  // Find input/output/caching rows in the standard table
-  const standardTable = pricingTables[0];
-  const batchTable = pricingTables.length > 1 ? pricingTables[1] : null;
+    const standardPrices = extractTierPrices(pricingTables[0].rows);
+    if (!standardPrices) continue;
 
-  // Column layout: 0: (empty/label) | 1: Free Tier | 2: Paid Tier
-  const PAID_COL = 2;
+    const batchPrices =
+      pricingTables.length > 1 ? extractTierPrices(pricingTables[1].rows) : null;
 
-  let inputPer1M: number | null = null;
-  let outputPer1M: number | null = null;
-  let cachePer1M: number | null = null;
-  let batchInputPer1M: number | null = null;
-  let batchOutputPer1M: number | null = null;
-
-  for (const row of standardTable.rows) {
-    const label = row[0]?.toLowerCase() ?? "";
-    const paidCell = row[PAID_COL] ?? "";
-
-    if (label.startsWith("input price")) {
-      inputPer1M = extractDollarAmount(paidCell);
-    } else if (label.startsWith("output price")) {
-      outputPer1M = extractDollarAmount(paidCell);
-    } else if (label.startsWith("context caching")) {
-      cachePer1M = extractDollarAmount(paidCell);
-    }
+    results.push(buildGooglePricing(modelId, standardPrices, batchPrices));
   }
 
-  if (batchTable) {
-    for (const row of batchTable.rows) {
-      const label = row[0]?.toLowerCase() ?? "";
-      const paidCell = row[PAID_COL] ?? "";
-
-      if (label.startsWith("input price")) {
-        batchInputPer1M = extractDollarAmount(paidCell);
-      } else if (label.startsWith("output price")) {
-        batchOutputPer1M = extractDollarAmount(paidCell);
-      }
-    }
-  }
-
-  return {
-    ...known,
-    inputPricePer1k: inputPer1M !== null ? per1MtoPer1K(inputPer1M) : known.inputPricePer1k,
-    outputPricePer1k: outputPer1M !== null ? per1MtoPer1K(outputPer1M) : known.outputPricePer1k,
-    cachedInputPricePer1k: cachePer1M !== null ? per1MtoPer1K(cachePer1M) : known.cachedInputPricePer1k,
-    batchInputPricePer1k: batchInputPer1M !== null ? per1MtoPer1K(batchInputPer1M) : known.batchInputPricePer1k,
-    batchOutputPricePer1k: batchOutputPer1M !== null ? per1MtoPer1K(batchOutputPer1M) : known.batchOutputPricePer1k,
-  };
+  return results;
 }
 
 /**
- * Parse Google's pricing markdown and extract per-model pricing.
+ * Parse Google pricing content (HTML or legacy markdown) and extract
+ * per-model pricing. Models tracked in KNOWN_MODELS that the page no
+ * longer lists keep their static fallback pricing.
  */
 function parseGooglePricing(content: string): NormalizedModelPricing[] {
-  const sections = splitModelSections(content);
-  const results: NormalizedModelPricing[] = [];
+  const parsed = looksLikeHtml(content)
+    ? parseGoogleHtmlPricing(content)
+    : parseGoogleMarkdownPricing(content);
+
+  const seen = new Set(parsed.map((m) => m.modelIdentifier));
+  const results = [...parsed];
 
   for (const known of KNOWN_MODELS) {
-    const section = sections.get(known.modelIdentifier);
-    if (!section) {
+    if (!seen.has(known.modelIdentifier)) {
       results.push(known);
-      continue;
     }
-    results.push(extractGoogleModelPricing(section, known));
   }
 
   return results;
@@ -227,8 +409,8 @@ export class GooglePricingSource implements PricingSource {
         throw new Error(`Google pricing page returned ${response.status}`);
       }
 
-      const markdown = await response.text();
-      const models = parseGooglePricing(markdown);
+      const content = await response.text();
+      const models = parseGooglePricing(content);
 
       if (models.length === 0) {
         throw new Error("No models parsed from Google pricing page");

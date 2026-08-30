@@ -326,8 +326,17 @@ export class ExecutionOrchestrator {
         );
       }
 
-      // 5b. Non-retryable failure — stop immediately (no fallback)
-      if (!result.error?.retryable) {
+      // 5b. Non-retryable failure — stop immediately (no fallback).
+      //
+      // Exception: MODEL_UNAVAILABLE is specific to ONE target — the
+      // provider retired or restricted that exact model (e.g. a model
+      // still present in the listing API but closed to new users). The
+      // next fallback target is a DIFFERENT model (usually a different
+      // provider), so it may still serve the request.
+      if (
+        !result.error?.retryable &&
+        result.error?.code !== "MODEL_UNAVAILABLE"
+      ) {
         break;
       }
 

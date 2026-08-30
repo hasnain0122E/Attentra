@@ -8,6 +8,7 @@
  * Architecture:
  *   1. Fetch the official pricing page as markdown
  *   2. Parse the model pricing table (Base Input / Cache / Output columns)
+ *      for every live (non-retired) Claude model
  *   3. Extract per-model pricing and normalize to per-1K tokens
  *   4. Batch = 50% of standard (per Anthropic docs)
  *   5. Fall back to static known pricing if fetch/parse fails
@@ -26,6 +27,7 @@ import {
   per1MtoPer1K,
   findRowByFirstCell,
 } from "./markdown-parser";
+import { classifyModelProfile } from "@/lib/catalog/profiles";
 
 const SOURCE_URL = "https://docs.anthropic.com/en/docs/about-claude/pricing";
 const MD_URL = "https://platform.claude.com/docs/en/about-claude/pricing.md";
@@ -97,13 +99,23 @@ const KNOWN_MODELS: NormalizedModelPricing[] = [
 ];
 
 /**
- * Map from known display names (as they appear in the pricing table)
- * to our model identifiers.
+ * Map from display names (as they appear in the pricing table) to our
+ * model identifiers (the Anthropic Models API ids). Newly released
+ * models become priced routing candidates as soon as they appear in
+ * the official table; rows marked retired or limited availability are
+ * never parsed.
  */
 const DISPLAY_NAME_TO_ID: Record<string, string> = {
   "claude sonnet 5": "claude-sonnet-5",
   "claude opus 5": "claude-opus-5",
   "claude haiku 4.5": "claude-haiku-4-5-20251001",
+  "claude fable 5": "claude-fable-5",
+  "claude opus 4.8": "claude-opus-4-8",
+  "claude opus 4.7": "claude-opus-4-7",
+  "claude opus 4.6": "claude-opus-4-6",
+  "claude opus 4.5": "claude-opus-4-5-20251101",
+  "claude sonnet 4.6": "claude-sonnet-4-6",
+  "claude sonnet 4.5": "claude-sonnet-4-5-20250929",
 };
 
 /**
@@ -111,6 +123,9 @@ const DISPLAY_NAME_TO_ID: Record<string, string> = {
  *
  * Table format:
  * | Model | Base Input Tokens | 5m Cache Writes | 1h Cache Writes | Cache Hits & Refreshes | Output Tokens |
+ *
+ * Rows marked retired or limited availability are skipped — catalog
+ * discovery remains the authority on model availability.
  */
 function parseAnthropicPricing(content: string): NormalizedModelPricing[] {
   const tables = parseMarkdownTables(content);
@@ -131,7 +146,12 @@ function parseAnthropicPricing(content: string): NormalizedModelPricing[] {
     const row = findRowByFirstCell(pricingTable, displayName);
     const known = KNOWN_MODELS.find((m) => m.modelIdentifier === modelId);
 
-    if (!row || !known) {
+    // Retired / limited-availability rows are never priced.
+    if (row && /retired|limited availability/i.test(row[0] ?? "")) {
+      continue;
+    }
+
+    if (!row) {
       if (known) results.push(known);
       continue;
     }
@@ -144,20 +164,48 @@ function parseAnthropicPricing(content: string): NormalizedModelPricing[] {
     const cacheHitPer1M = extractDollarAmount(row[4]);
     const outputPer1M = extractDollarAmount(row[5]);
 
+    // Never invent prices — a row without usable input/output prices falls
+    // back to the static entry (tracked models) or is skipped.
+    if (inputPer1M === null || outputPer1M === null) {
+      if (known) results.push(known);
+      continue;
+    }
+
+    // Newly recognized models get metadata from the shared family profiles.
+    const profile = classifyModelProfile("anthropic", modelId);
+    const base: NormalizedModelPricing = known ?? {
+      modelIdentifier: modelId,
+      displayName: profile.displayName,
+      capabilities: profile.capabilities,
+      tier: profile.tier,
+      contextWindow: profile.contextWindow,
+      expectedLatencyMs: profile.expectedLatencyMs,
+      inputPricePer1k: per1MtoPer1K(inputPer1M),
+      outputPricePer1k: per1MtoPer1K(outputPer1M),
+      active: true,
+    };
+
+    // Cache pricing dimensions (per 1K tokens) — omitted when unavailable.
+    const cacheDimensions: Record<string, number> = {};
+    if (cacheWrite5mPer1M !== null) {
+      cacheDimensions.cacheWrite5m = per1MtoPer1K(cacheWrite5mPer1M);
+    }
+    if (cacheWrite1hPer1M !== null) {
+      cacheDimensions.cacheWrite1h = per1MtoPer1K(cacheWrite1hPer1M);
+    }
+    if (cacheHitPer1M !== null) {
+      cacheDimensions.cacheHit = per1MtoPer1K(cacheHitPer1M);
+    }
+
     results.push({
-      ...known,
-      inputPricePer1k: inputPer1M !== null ? per1MtoPer1K(inputPer1M) : known.inputPricePer1k,
-      outputPricePer1k: outputPer1M !== null ? per1MtoPer1K(outputPer1M) : known.outputPricePer1k,
+      ...base,
+      inputPricePer1k: per1MtoPer1K(inputPer1M),
+      outputPricePer1k: per1MtoPer1K(outputPer1M),
       // Batch = 50% of standard (per Anthropic docs)
-      batchInputPricePer1k:
-        inputPer1M !== null ? per1MtoPer1K(inputPer1M * 0.5) : known.batchInputPricePer1k,
-      batchOutputPricePer1k:
-        outputPer1M !== null ? per1MtoPer1K(outputPer1M * 0.5) : known.batchOutputPricePer1k,
-      pricingDimensions: {
-        cacheWrite5m: cacheWrite5mPer1M !== null ? per1MtoPer1K(cacheWrite5mPer1M) : known.pricingDimensions?.cacheWrite5m,
-        cacheWrite1h: cacheWrite1hPer1M !== null ? per1MtoPer1K(cacheWrite1hPer1M) : known.pricingDimensions?.cacheWrite1h,
-        cacheHit: cacheHitPer1M !== null ? per1MtoPer1K(cacheHitPer1M) : known.pricingDimensions?.cacheHit,
-      },
+      batchInputPricePer1k: per1MtoPer1K(inputPer1M * 0.5),
+      batchOutputPricePer1k: per1MtoPer1K(outputPer1M * 0.5),
+      pricingDimensions:
+        Object.keys(cacheDimensions).length > 0 ? cacheDimensions : known?.pricingDimensions,
     });
   }
 

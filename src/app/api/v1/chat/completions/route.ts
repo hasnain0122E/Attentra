@@ -27,8 +27,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { routeAndPersist, prepareExecutionFlow } from "@/lib/routing";
 import type { RoutingErrorCode } from "@/lib/routing";
-import { ExecutionOrchestrator, sanitizeErrorMessage } from "@/lib/execution";
-import type { ExecutionResult } from "@/lib/routing/execution-plan";
+import {
+  ExecutionOrchestrator,
+  sanitizeErrorMessage,
+  type OrchestratorResult,
+} from "@/lib/execution";
+import type { ExecutionPlan, ExecutionResult } from "@/lib/routing/execution-plan";
+import { prisma } from "@/lib/prisma";
 import { validateChatRequest } from "./validation";
 
 // Force dynamic rendering — this endpoint must never be statically generated
@@ -72,19 +77,52 @@ function errorToHttpStatus(code: string): number {
   }
 }
 
-/** Build a normalized success response. */
+/**
+ * Build a normalized success response.
+ *
+ * Includes routing transparency fields (selected model, logical provider,
+ * routing reason, task type, complexity, projected cost) sourced directly
+ * from the ExecutionPlan — the route never recomputes any of them.
+ */
 function buildSuccessResponse(
   requestId: string,
-  result: ExecutionResult
+  result: OrchestratorResult,
+  plan: ExecutionPlan
 ) {
+  const successfulAttempt =
+    result.executionAttempts.find((attempt) => attempt.success);
+
   return {
     success: true as const,
     requestId,
+
     content: result.content ?? "",
-    model: result.modelId ?? "",
-    usage: result.usage,
-    latencyMs: result.latencyMs,
-    actualCost: result.actualCost,
+
+    routing: {
+      selectedModelId: plan.primary.modelId,
+      selectedModelIdentifier: plan.primary.modelIdentifier,
+      selectedModelDisplayName: plan.primary.displayName,
+      selectedProvider: plan.primary.providerId,
+
+      reason: plan.routingExplanation,
+      taskType: plan.taskType,
+      complexity: plan.complexity,
+      projectedCost: plan.projectedCost,
+    },
+
+    execution: {
+      modelId: result.modelId ?? "",
+      modelIdentifier: successfulAttempt?.modelIdentifier ?? "",
+      provider: result.providerId ?? "",
+
+      fallbackUsed: result.fallback?.used === true,
+      attempts: result.attempts,
+
+      usage: result.usage,
+      latencyMs: result.latencyMs,
+      actualCost: result.actualCost,
+    },
+
     timestamp: result.timestamp,
   };
 }
@@ -226,13 +264,16 @@ export async function POST(request: NextRequest) {
     const orchestrator = new ExecutionOrchestrator();
     const result = await orchestrator.execute(
       executionFlow.plan,
-      messages
+      messages,
+      // Prisma client lets the orchestrator's existing computeActualCost()
+      // derive actual cost from real usage × the model's active pricing.
+      { prisma }
     );
 
     // ── 8. Return normalized response ──────────────────
     if (result.success) {
       return NextResponse.json(
-        buildSuccessResponse(effectiveRequestId, result)
+        buildSuccessResponse(effectiveRequestId, result, executionFlow.plan)
       );
     }
 
