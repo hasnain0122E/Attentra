@@ -1,123 +1,97 @@
-import type { ElementType } from "react";
+import Link from "next/link";
 
 import {
+  ArrowRight,
   Buildings,
-  ChartBar,
-  UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
+
+import BusinessMemberActivity from "@/components/business/overview/BusinessMemberActivity";
+import BusinessMetricCard from "@/components/business/overview/BusinessMetricCard";
+import BusinessModelDistribution from "@/components/business/overview/BusinessModelDistribution";
+import BusinessRecentRequests from "@/components/business/overview/BusinessRecentRequests";
+import BusinessRoutingHealth from "@/components/business/overview/BusinessRoutingHealth";
+
+import { businessMetrics } from "@/lib/business/overview-data";
 
 export default function BusinessPage() {
   return (
     <div className="space-y-7">
-      <section className="relative overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-        {/* Ambient glow */}
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-8">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 hidden overflow-hidden md:block"
         >
           <div
-            className="absolute -right-[8%] -top-[50%] h-[155%] w-[55%]"
+            className="absolute -right-[7%] -top-[55%] h-[165%] w-[58%]"
             style={{
               background:
-                "radial-gradient(circle at center, rgba(217,119,69,0.20) 0%, rgba(217,119,69,0.09) 32%, rgba(217,119,69,0.03) 54%, rgba(217,119,69,0) 73%)",
+                "radial-gradient(circle at center, rgba(217,119,69,0.28) 0%, rgba(217,119,69,0.12) 30%, rgba(217,119,69,0.045) 52%, rgba(217,119,69,0) 72%)",
             }}
           />
         </div>
 
-        <div className="relative z-10">
-          <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--color-accent)]">
-            Business workspace
+        <div className="relative z-10 flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--color-accent)]">
+              <Buildings
+                size={12}
+                weight="duotone"
+              />
+
+              Acme AI
+            </div>
+
+            <h1 className="mt-3 max-w-[760px] font-reservation text-[clamp(2.1rem,3.6vw,3.7rem)] font-normal leading-[0.95] tracking-[-0.04em] text-[var(--color-foreground)]">
+              Organization-wide AI visibility.
+            </h1>
+
+            <p className="mt-5 max-w-[690px] text-[13px] leading-6 text-[var(--color-foreground-secondary)] sm:text-[14px]">
+              Monitor request activity, model usage,
+              routing health, fallback behavior, and
+              team adoption across your organization.
+            </p>
           </div>
 
-          <h1 className="mt-3 max-w-[760px] font-reservation text-[clamp(2.1rem,4vw,4rem)] font-normal leading-[0.95] tracking-[-0.04em] text-[var(--color-foreground)]">
-            Organization-wide AI control.
-          </h1>
+          <Link
+            href="/business/requests"
+            className="group inline-flex w-fit shrink-0 items-center gap-2 rounded-full bg-[var(--color-foreground)] px-5 py-3 text-[11px] font-medium text-white transition-transform duration-200 hover:-translate-y-0.5"
+          >
+            View requests
 
-          <p className="mt-5 max-w-[680px] text-[13px] leading-6 text-[var(--color-foreground-secondary)] sm:text-[14px]">
-            Monitor how your organization routes,
-            executes, and manages AI requests
-            across teams, models, providers, and
-            shared infrastructure.
-          </p>
+            <ArrowRight
+              size={12}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            />
+          </Link>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <PreviewCard
-          icon={Buildings}
-          eyebrow="Organization"
-          title="Acme AI"
-          description="One shared workspace for organization-wide AI routing."
-        />
-
-        <PreviewCard
-          icon={UsersThree}
-          eyebrow="Team"
-          title="Members"
-          description="Monitor usage and access across organization members."
-        />
-
-        <PreviewCard
-          icon={ChartBar}
-          eyebrow="Intelligence"
-          title="Routing visibility"
-          description="Understand how workloads are distributed across your AI stack."
-        />
+      {/* Organization metrics */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {businessMetrics.map((metric) => (
+          <BusinessMetricCard
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+            change={metric.change}
+            detail={metric.detail}
+            accent={metric.accent}
+          />
+        ))}
       </section>
 
-      <section className="rounded-[24px] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] px-6 py-12 text-center">
-        <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
-          Phase 10
-        </div>
-
-        <h2 className="mt-3 font-reservation text-[28px] tracking-[-0.025em] text-[var(--color-foreground)]">
-          Business intelligence is next.
-        </h2>
-
-        <p className="mx-auto mt-3 max-w-[500px] text-[10px] leading-5 text-[var(--color-foreground-secondary)]">
-          Organization metrics, routing activity,
-          request visibility, model usage, members,
-          credentials, and controls will populate
-          this workspace in the following steps.
-        </p>
+      {/* Model + routing */}
+      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.75fr]">
+        <BusinessModelDistribution />
+        <BusinessRoutingHealth />
       </section>
+
+      {/* Members */}
+      <BusinessMemberActivity />
+
+      {/* Recent organization requests */}
+      <BusinessRecentRequests />
     </div>
-  );
-}
-
-interface PreviewCardProps {
-  icon: ElementType;
-  eyebrow: string;
-  title: string;
-  description: string;
-}
-
-function PreviewCard({
-  icon: Icon,
-  eyebrow,
-  title,
-  description,
-}: PreviewCardProps) {
-  return (
-    <article className="rounded-[22px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-        <Icon
-          size={16}
-          weight="duotone"
-        />
-      </div>
-
-      <div className="mt-5 font-mono text-[7px] uppercase tracking-[0.12em] text-[var(--color-foreground-muted)]">
-        {eyebrow}
-      </div>
-
-      <h2 className="mt-2 text-[14px] font-semibold text-[var(--color-foreground)]">
-        {title}
-      </h2>
-
-      <p className="mt-2 text-[9px] leading-5 text-[var(--color-foreground-secondary)]">
-        {description}
-      </p>
-    </article>
   );
 }
