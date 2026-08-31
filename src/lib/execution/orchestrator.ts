@@ -23,9 +23,11 @@
  * - Treat any provider differently from another (provider-neutral)
  *
  * Fallback policy:
- * - Only retryable errors trigger fallback (TIMEOUT, REQUEST_TIMEOUT,
+ * - Retryable errors trigger fallback (TIMEOUT, REQUEST_TIMEOUT,
  *   RATE_LIMIT, SERVER_ERROR, NETWORK_ERROR)
- * - Non-retryable errors stop execution immediately
+ * - MODEL_UNAVAILABLE also falls through because it is specific to the
+ *   attempted model; the next fallback may still be executable
+ * - Other non-retryable errors stop execution immediately
  * - maxAttempts defaults to fallbacks.length + 1, capped at MAX_ATTEMPTS
  *
  * Actual cost:
