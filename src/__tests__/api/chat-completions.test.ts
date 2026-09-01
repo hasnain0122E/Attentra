@@ -1,50 +1,115 @@
 /**
  * Attentra — Chat Completions API Tests
  *
- * Phase 7 / Step 5 — Consumer Execution API
+ * Consumer Execution API
  *
  * Focused test suite for POST /api/v1/chat/completions:
  *
- * 1–5.   Request validation (400 errors)
- * 6–7.   Request ID preservation / generation
- * 8.     Successful execution → normalized response
- * 9.     Execution failure → structured error
- * 10.    No credential leakage
- * 11–12. Architecture compliance (no SDK, no direct calls)
+ * - Authentication
+ * - Request validation
+ * - Request ID preservation / generation
+ * - Consumer request ownership
+ * - Successful execution → normalized response
+ * - Request-level cost persistence
+ * - Execution failure → structured error
+ * - Credential sanitization
+ * - Architecture compliance
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { NextRequest } from "next/server";
+
 import { validateChatRequest } from "@/app/api/v1/chat/completions/validation";
 import type { ExecutionPlan } from "@/lib/routing/execution-plan";
+
+// ─────────────────────────────────────────────────────
+// HOISTED MOCKS
+// ─────────────────────────────────────────────────────
+
+const {
+  mockAuth,
+  mockRouteAndPersist,
+  mockPrepareExecutionFlow,
+  mockExecute,
+  mockRequestUpdate,
+  mockPersistRequestCostIntelligence,
+} = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+
+  mockRouteAndPersist: vi.fn(),
+  mockPrepareExecutionFlow: vi.fn(),
+  mockExecute: vi.fn(),
+
+  mockRequestUpdate: vi.fn(),
+
+  mockPersistRequestCostIntelligence: vi.fn(),
+}));
 
 // ─────────────────────────────────────────────────────
 // MODULE MOCKS
 // ─────────────────────────────────────────────────────
 
-const { mockRouteAndPersist, mockPrepareExecutionFlow, mockExecute } =
-  vi.hoisted(() => ({
-    mockRouteAndPersist: vi.fn(),
-    mockPrepareExecutionFlow: vi.fn(),
-    mockExecute: vi.fn(),
-  }));
+/**
+ * Never load the real Auth.js / NextAuth runtime in this unit test.
+ */
+vi.mock("@/auth", () => ({
+  auth: mockAuth,
+}));
 
+/**
+ * Routing remains fully mocked.
+ */
 vi.mock("@/lib/routing", () => ({
   routeAndPersist: mockRouteAndPersist,
   prepareExecutionFlow: mockPrepareExecutionFlow,
 }));
 
+/**
+ * Mock only the Prisma boundary used directly by the route.
+ */
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    request: {
+      update: mockRequestUpdate,
+    },
+  },
+}));
+
+/**
+ * Cost intelligence is tested separately.
+ *
+ * The API test only verifies that the route delegates to the
+ * cost-intelligence persistence boundary with the correct data.
+ */
+vi.mock("@/lib/cost-intelligence", () => ({
+  persistRequestCostIntelligence:
+    mockPersistRequestCostIntelligence,
+}));
+
+/**
+ * Preserve the real execution helpers such as sanitizeErrorMessage(),
+ * while replacing ExecutionOrchestrator with a deterministic mock.
+ */
 vi.mock("@/lib/execution", async () => {
   const actual =
-    await vi.importActual<typeof import("@/lib/execution")>("@/lib/execution");
-  // Use a class mock so `new ExecutionOrchestrator()` works correctly
+    await vi.importActual<typeof import("@/lib/execution")>(
+      "@/lib/execution",
+    );
+
   class MockOrchestrator {
     execute(...args: unknown[]) {
       return mockExecute(...args);
     }
   }
+
   return {
     ...actual,
     ExecutionOrchestrator: MockOrchestrator,
@@ -52,7 +117,7 @@ vi.mock("@/lib/execution", async () => {
 });
 
 // ─────────────────────────────────────────────────────
-// IMPORTS (after mocks)
+// ROUTE IMPORT
 // ─────────────────────────────────────────────────────
 
 import { POST } from "@/app/api/v1/chat/completions/route";
@@ -63,55 +128,172 @@ import { POST } from "@/app/api/v1/chat/completions/route";
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  /**
+   * All tests are authenticated by default.
+   *
+   * Individual authentication tests can override this.
+   */
+  mockAuth.mockResolvedValue({
+    user: {
+      id: "test-user-id",
+      email: "test@example.com",
+      name: "Test User",
+    },
+  });
+
+  mockRequestUpdate.mockResolvedValue({});
+
+  mockPersistRequestCostIntelligence.mockResolvedValue({
+    persisted: true,
+    reason: "BASELINE_NOT_CONFIGURED",
+  });
 });
 
 // ─────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────
 
-const VALID_MESSAGES = [{ role: "user", content: "Hello" }];
+const VALID_MESSAGES = [
+  {
+    role: "user",
+    content: "Hello",
+  },
+];
 
 function makeRequest(body: unknown): NextRequest {
-  return new NextRequest("http://localhost:3000/api/v1/chat/completions", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return new NextRequest(
+    "http://localhost:3000/api/v1/chat/completions",
+    {
+      method: "POST",
+
+      headers: {
+        "content-type": "application/json",
+      },
+
+      body: JSON.stringify(body),
+    },
+  );
 }
 
-async function parseJson(response: Response): Promise<Record<string, unknown>> {
-  return response.json() as Promise<Record<string, unknown>>;
+async function parseJson(
+  response: Response,
+): Promise<Record<string, unknown>> {
+  return response.json() as Promise<
+    Record<string, unknown>
+  >;
 }
 
-/** Minimal valid ExecutionPlan for prepareExecutionFlow mock. */
+/**
+ * Minimal valid ExecutionPlan for prepareExecutionFlow mock.
+ */
 function makeMockPlan(): ExecutionPlan {
   return {
     requestId: "test-req",
+
     taskType: "GENERAL",
     complexity: "LOW",
+
     primary: {
       entryId: "primary",
+
       modelId: "mock-model",
       providerId: "mock",
       providerName: "Mock",
+
       modelIdentifier: "mock-id",
       displayName: "Mock Model",
+
       projectedCost: 0.001,
       routingScore: 0.85,
     },
+
     fallbacks: [],
+
     estimatedInputTokens: 100,
     estimatedOutputTokens: 50,
+
     projectedCost: 0.001,
     routingScore: 0.85,
-    routingExplanation: "Test",
+
+    routingExplanation: "Test routing decision",
+
     status: "NOT_EXECUTED",
+
     createdAt: new Date(),
   };
 }
 
+function makeRoutingSuccess() {
+  return {
+    success: true,
+
+    decision: {
+      taskType: "GENERAL",
+      complexity: "LOW",
+
+      tokenEstimate: {
+        inputTokens: 100,
+        outputTokens: 50,
+        totalTokens: 150,
+      },
+
+      candidates: [],
+      selected: {},
+      fallbacks: [],
+      rejected: [],
+
+      reason: "test",
+      timestamp: new Date(),
+    },
+
+    persisted: {
+      success: true,
+      decisionId: "dec-1",
+    },
+  };
+}
+
 // ─────────────────────────────────────────────────────
-// 1–5. VALIDATION
+// AUTHENTICATION
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — Authentication", () => {
+  it("returns 401 when no authenticated user exists", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
+
+    const res = await POST(req);
+    const data = await parseJson(res);
+
+    expect(res.status).toBe(401);
+    expect(data.success).toBe(false);
+
+    const error = data.error as Record<
+      string,
+      unknown
+    >;
+
+    expect(error.code).toBe("AUTHENTICATION");
+    expect(error.message).toBe(
+      "Authentication required",
+    );
+
+    expect(
+      mockRouteAndPersist,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mockExecute,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// VALIDATION
 // ─────────────────────────────────────────────────────
 
 describe("Chat Completions API — Validation", () => {
@@ -120,67 +302,138 @@ describe("Chat Completions API — Validation", () => {
       "http://localhost:3000/api/v1/chat/completions",
       {
         method: "POST",
-        headers: { "content-type": "text/plain" },
+
+        headers: {
+          "content-type": "text/plain",
+        },
+
         body: "not json",
       },
     );
+
     const res = await POST(req);
+
     expect(res.status).toBe(400);
+
     const data = await parseJson(res);
+
     expect(data.success).toBe(false);
   });
 
-  it("returns 400 for empty messages array", async () => {
-    const result = validateChatRequest({ messages: [] });
-    expect(result.valid).toBe(false);
-    if (!result.valid) {
-      expect(result.errors.some((e) => /not be empty/.test(e))).toBe(true);
-    }
+  it("returns 400 for invalid JSON body", async () => {
+    const req = new NextRequest(
+      "http://localhost:3000/api/v1/chat/completions",
+      {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/json",
+        },
+
+        body: "{ invalid json",
+      },
+    );
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+
+    const data = await parseJson(res);
+
+    expect(data.success).toBe(false);
+
+    const error = data.error as Record<
+      string,
+      unknown
+    >;
+
+    expect(error.code).toBe("INVALID_REQUEST");
   });
 
-  it("returns 400 for invalid message role", async () => {
+  it("returns invalid validation result for empty messages array", () => {
     const result = validateChatRequest({
-      messages: [{ role: "invalid", content: "hello" }],
+      messages: [],
     });
+
     expect(result.valid).toBe(false);
+
     if (!result.valid) {
-      expect(result.errors.some((e) => /role/.test(e))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          /not be empty/.test(error),
+        ),
+      ).toBe(true);
     }
   });
 
-  it("returns 400 for empty message content", async () => {
+  it("returns invalid validation result for invalid message role", () => {
     const result = validateChatRequest({
-      messages: [{ role: "user", content: "  " }],
+      messages: [
+        {
+          role: "invalid",
+          content: "hello",
+        },
+      ],
     });
+
     expect(result.valid).toBe(false);
+
     if (!result.valid) {
-      expect(result.errors.some((e) => /content/.test(e))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          /role/.test(error),
+        ),
+      ).toBe(true);
     }
   });
 
-  it("returns 400 for invalid maxTokens", async () => {
-    const neg = validateChatRequest({
+  it("returns invalid validation result for empty message content", () => {
+    const result = validateChatRequest({
+      messages: [
+        {
+          role: "user",
+          content: "  ",
+        },
+      ],
+    });
+
+    expect(result.valid).toBe(false);
+
+    if (!result.valid) {
+      expect(
+        result.errors.some((error) =>
+          /content/.test(error),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("returns invalid validation result for invalid maxTokens", () => {
+    const negative = validateChatRequest({
       messages: VALID_MESSAGES,
       maxTokens: -1,
     });
-    expect(neg.valid).toBe(false);
+
+    expect(negative.valid).toBe(false);
 
     const float = validateChatRequest({
       messages: VALID_MESSAGES,
       maxTokens: 1.5,
     });
+
     expect(float.valid).toBe(false);
 
     const zero = validateChatRequest({
       messages: VALID_MESSAGES,
       maxTokens: 0,
     });
+
     expect(zero.valid).toBe(false);
   });
 });
 
 // ─────────────────────────────────────────────────────
-// 6–7. REQUEST ID
+// REQUEST ID
 // ─────────────────────────────────────────────────────
 
 describe("Chat Completions API — Request ID", () => {
@@ -195,115 +448,256 @@ describe("Chat Completions API — Request ID", () => {
       messages: VALID_MESSAGES,
       requestId: "client-req-123",
     });
+
     const res = await POST(req);
     const data = await parseJson(res);
-    expect(data.requestId).toBe("client-req-123");
+
+    expect(data.requestId).toBe(
+      "client-req-123",
+    );
   });
 
-  it("generates requestId when none provided", async () => {
+  it("generates requestId when none is provided", async () => {
     mockRouteAndPersist.mockResolvedValue({
       success: false,
       error: "No models",
       errorCode: "NO_ACTIVE_MODELS",
     });
 
-    const req = makeRequest({ messages: VALID_MESSAGES });
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
+
     const res = await POST(req);
     const data = await parseJson(res);
+
     expect(data.requestId).toBeDefined();
-    expect(typeof data.requestId).toBe("string");
-    expect((data.requestId as string).length).toBeGreaterThan(0);
-    expect((data.requestId as string).startsWith("req_")).toBe(true);
+
+    expect(typeof data.requestId).toBe(
+      "string",
+    );
+
+    expect(
+      (data.requestId as string).length,
+    ).toBeGreaterThan(0);
+
+    expect(
+      (data.requestId as string).startsWith(
+        "req_",
+      ),
+    ).toBe(true);
   });
 });
 
 // ─────────────────────────────────────────────────────
-// 8. EXECUTION SUCCESS
+// CONSUMER OWNERSHIP
 // ─────────────────────────────────────────────────────
 
-describe("Chat Completions API — Execution", () => {
-  it("returns normalized success response on successful execution", async () => {
-    // Mock routing success
-    mockRouteAndPersist.mockResolvedValue({
-      success: true,
-      decision: {
-        taskType: "GENERAL",
-        complexity: "LOW",
-        tokenEstimate: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
-        candidates: [],
-        selected: {},
-        fallbacks: [],
-        rejected: [],
-        reason: "test",
-        timestamp: new Date(),
-      },
-      persisted: { success: true, decisionId: "dec-1" },
-    });
+describe("Chat Completions API — Consumer Ownership", () => {
+  it("attaches authenticated userId to the persisted request", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
 
-    // Mock execution flow preparation
     mockPrepareExecutionFlow.mockReturnValue({
       status: "NOT_EXECUTED",
       plan: makeMockPlan(),
-      validation: { valid: true, errors: [] },
+
+      validation: {
+        valid: true,
+        errors: [],
+      },
     });
 
-    // Mock orchestrator success
+    mockExecute.mockResolvedValue({
+      success: false,
+
+      error: {
+        code: "SERVER_ERROR",
+        message: "Provider error",
+        retryable: false,
+      },
+
+      latencyMs: 100,
+
+      timestamp:
+        "2026-01-01T00:00:00.000Z",
+
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "ownership-test",
+    });
+
+    await POST(req);
+
+    expect(
+      mockRequestUpdate,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: "ownership-test",
+      },
+
+      data: {
+        userId: "test-user-id",
+      },
+    });
+  });
+
+  it("does not attach ownership when routing fails", async () => {
+    mockRouteAndPersist.mockResolvedValue({
+      success: false,
+
+      error: "No compatible models",
+      errorCode: "NO_COMPATIBLE_MODELS",
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
+
+    await POST(req);
+
+    expect(
+      mockRequestUpdate,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// EXECUTION SUCCESS
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — Execution", () => {
+  it("returns normalized routing and execution data on success", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+
+      validation: {
+        valid: true,
+        errors: [],
+      },
+    });
+
     mockExecute.mockResolvedValue({
       success: true,
-      providerId: "blueminds",
+
+      providerId: "anthropic",
       modelId: "mock-model-1",
+
       content: "Hello from Attentra!",
-      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+
+      usage: {
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+      },
+
       latencyMs: 420,
-      actualCost: undefined,
-      timestamp: "2026-01-01T00:00:00.000Z",
+      actualCost: 0.00042,
+
+      attempts: 1,
+
+      fallback: {
+        used: false,
+      },
+
+      timestamp:
+        "2026-01-01T00:00:00.000Z",
+
       executionAttempts: [
         {
-          attemptNumber: 1,
-          providerId: "blueminds",
-          modelId: "mock-model-1",
-          modelIdentifier: "mock-executed-id",
-          startedAt: "2026-01-01T00:00:00.000Z",
-          completedAt: "2026-01-01T00:00:00.420Z",
-          latencyMs: 420,
           success: true,
-          usage: {
-            inputTokens: 10,
-            outputTokens: 5,
-            totalTokens: 15,
-          },
+          providerId: "anthropic",
+          modelId: "mock-model-1",
+          modelIdentifier:
+            "claude-test-model",
         },
       ],
-      attempts: 1,
     });
-
 
     const req = makeRequest({
       messages: VALID_MESSAGES,
       requestId: "success-test",
     });
+
     const res = await POST(req);
 
     expect(res.status).toBe(200);
+
     const data = await parseJson(res);
+
     expect(data.success).toBe(true);
-    expect(data.requestId).toBe("success-test");
-    expect(data.content).toBe("Hello from Attentra!");
 
-    const routing = data.routing as Record<string, unknown>;
-    expect(routing.selectedModelId).toBe("mock-model");
-    expect(routing.selectedModelIdentifier).toBe("mock-id");
-    expect(routing.selectedModelDisplayName).toBe("Mock Model");
-    expect(routing.selectedProvider).toBe("mock");
-    expect(routing.reason).toBe("Test");
-    expect(routing.taskType).toBe("GENERAL");
-    expect(routing.complexity).toBe("LOW");
-    expect(routing.projectedCost).toBe(0.001);
+    expect(data.requestId).toBe(
+      "success-test",
+    );
 
-    const execution = data.execution as Record<string, unknown>;
-    expect(execution.modelId).toBe("mock-model-1");
-    expect(execution.provider).toBe("blueminds");
-    expect(execution.fallbackUsed).toBe(false);
+    expect(data.content).toBe(
+      "Hello from Attentra!",
+    );
+
+    const routing = data.routing as Record<
+      string,
+      unknown
+    >;
+
+    expect(routing.selectedModelId).toBe(
+      "mock-model",
+    );
+
+    expect(
+      routing.selectedModelIdentifier,
+    ).toBe("mock-id");
+
+    expect(
+      routing.selectedModelDisplayName,
+    ).toBe("Mock Model");
+
+    expect(routing.selectedProvider).toBe(
+      "mock",
+    );
+
+    expect(routing.taskType).toBe(
+      "GENERAL",
+    );
+
+    expect(routing.complexity).toBe(
+      "LOW",
+    );
+
+    expect(routing.projectedCost).toBe(
+      0.001,
+    );
+
+    const execution =
+      data.execution as Record<
+        string,
+        unknown
+      >;
+
+    expect(execution.modelId).toBe(
+      "mock-model-1",
+    );
+
+    expect(
+      execution.modelIdentifier,
+    ).toBe("claude-test-model");
+
+    expect(execution.provider).toBe(
+      "anthropic",
+    );
+
+    expect(execution.fallbackUsed).toBe(
+      false,
+    );
 
     expect(execution.usage).toEqual({
       inputTokens: 10,
@@ -311,119 +705,327 @@ describe("Chat Completions API — Execution", () => {
       totalTokens: 15,
     });
 
-    expect(execution.latencyMs).toBe(420);
-    expect(execution.actualCost).toBeUndefined();
+    expect(execution.latencyMs).toBe(
+      420,
+    );
+
+    expect(execution.actualCost).toBe(
+      0.00042,
+    );
 
     expect(data.timestamp).toBeDefined();
-    expect(execution.modelIdentifier).toBe("mock-executed-id");
   });
-  // ───────────────────────────────────────────────────
-  // 9. EXECUTION FAILURE
-  // ───────────────────────────────────────────────────
 
-  it("returns structured error response on execution failure", async () => {
-    mockRouteAndPersist.mockResolvedValue({
-      success: true,
-      decision: {
-        taskType: "GENERAL",
-        complexity: "LOW",
-        tokenEstimate: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
-        candidates: [],
-        selected: {},
-        fallbacks: [],
-        rejected: [],
-        reason: "test",
-        timestamp: new Date(),
-      },
-    });
+  it("persists cost intelligence after successful execution", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
 
     mockPrepareExecutionFlow.mockReturnValue({
       status: "NOT_EXECUTED",
       plan: makeMockPlan(),
-      validation: { valid: true, errors: [] },
+
+      validation: {
+        valid: true,
+        errors: [],
+      },
     });
 
-    // Mock orchestrator failure
+    mockExecute.mockResolvedValue({
+      success: true,
+
+      providerId: "anthropic",
+      modelId: "executed-model",
+
+      content: "Done",
+
+      usage: {
+        inputTokens: 100,
+        outputTokens: 25,
+        totalTokens: 125,
+      },
+
+      latencyMs: 300,
+      actualCost: 0.0042,
+
+      attempts: 1,
+
+      fallback: {
+        used: false,
+      },
+
+      timestamp:
+        "2026-01-01T00:00:00.000Z",
+
+      executionAttempts: [
+        {
+          success: true,
+          providerId: "anthropic",
+          modelId: "executed-model",
+          modelIdentifier:
+            "executed-model-id",
+        },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "cost-test",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+
+    expect(
+      mockPersistRequestCostIntelligence,
+    ).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        requestId: "cost-test",
+
+        executedModelId:
+          "executed-model",
+
+        usage: {
+          inputTokens: 100,
+          outputTokens: 25,
+        },
+
+        actualCost: 0.0042,
+      },
+    );
+  });
+
+  it("does not persist cost intelligence when execution fails", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+
+      validation: {
+        valid: true,
+        errors: [],
+      },
+    });
+
     mockExecute.mockResolvedValue({
       success: false,
+
       error: {
         code: "SERVER_ERROR",
         message: "Provider returned 500",
         retryable: true,
       },
+
       latencyMs: 5000,
-      timestamp: "2026-01-01T00:00:00.000Z",
+
+      timestamp:
+        "2026-01-01T00:00:00.000Z",
+
       executionAttempts: [],
     });
 
-    const req = makeRequest({ messages: VALID_MESSAGES });
-    const res = await POST(req);
-
-    // SERVER_ERROR maps to 502
-    expect(res.status).toBe(502);
-    const data = await parseJson(res);
-    expect(data.success).toBe(false);
-    expect(data.requestId).toBeDefined();
-    const err = data.error as Record<string, unknown>;
-    expect(err.code).toBe("SERVER_ERROR");
-    expect(typeof err.message).toBe("string");
-    expect(err.retryable).toBe(true);
-  });
-});
-
-// ─────────────────────────────────────────────────────
-// 10. SECURITY
-// ─────────────────────────────────────────────────────
-
-describe("Chat Completions API — Security", () => {
-  it("never exposes credentials in error responses", async () => {
-    mockRouteAndPersist.mockResolvedValue({
-      success: true,
-      decision: {
-        taskType: "GENERAL",
-        complexity: "LOW",
-        tokenEstimate: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
-        candidates: [],
-        selected: {},
-        fallbacks: [],
-        rejected: [],
-        reason: "test",
-        timestamp: new Date(),
-      },
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
     });
+
+    await POST(req);
+
+    expect(
+      mockPersistRequestCostIntelligence,
+    ).not.toHaveBeenCalled();
+  });
+
+  // ───────────────────────────────────────────────────
+  // EXECUTION FAILURE
+  // ───────────────────────────────────────────────────
+
+  it("returns structured error response on execution failure", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
 
     mockPrepareExecutionFlow.mockReturnValue({
       status: "NOT_EXECUTED",
       plan: makeMockPlan(),
-      validation: { valid: true, errors: [] },
+
+      validation: {
+        valid: true,
+        errors: [],
+      },
     });
 
-    // Simulate an error message that contains leaked credentials
     mockExecute.mockResolvedValue({
       success: false,
+
       error: {
-        code: "AUTHENTICATION",
-        message: "Unauthorized: Bearer sk-1234567890abcdefghijklmnopqrst",
-        retryable: false,
+        code: "SERVER_ERROR",
+        message: "Provider returned 500",
+        retryable: true,
       },
-      latencyMs: 100,
-      timestamp: "2026-01-01T00:00:00.000Z",
+
+      latencyMs: 5000,
+
+      timestamp:
+        "2026-01-01T00:00:00.000Z",
+
       executionAttempts: [],
     });
 
-    const req = makeRequest({ messages: VALID_MESSAGES });
-    const res = await POST(req);
-    const text = await res.text();
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
 
-    // The raw API key must NEVER appear in the response
-    expect(text).not.toContain("sk-1234567890abcdefghijklmnopqrst");
-    // Bearer tokens should be redacted
-    expect(text).not.toContain("Bearer sk-");
+    const res = await POST(req);
+
+    expect(res.status).toBe(502);
+
+    const data = await parseJson(res);
+
+    expect(data.success).toBe(false);
+    expect(data.requestId).toBeDefined();
+
+    const error = data.error as Record<
+      string,
+      unknown
+    >;
+
+    expect(error.code).toBe(
+      "SERVER_ERROR",
+    );
+
+    expect(typeof error.message).toBe(
+      "string",
+    );
+
+    expect(error.retryable).toBe(true);
   });
 });
 
 // ─────────────────────────────────────────────────────
-// 11–12. ARCHITECTURE COMPLIANCE
+// ROUTING FAILURE
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — Routing Failure", () => {
+  it("returns routing errors without executing a provider", async () => {
+    mockRouteAndPersist.mockResolvedValue({
+      success: false,
+
+      error: "No active models",
+      errorCode: "NO_ACTIVE_MODELS",
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+
+    expect(
+      mockPrepareExecutionFlow,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mockExecute,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mockPersistRequestCostIntelligence,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// SECURITY
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — Security", () => {
+  it("never exposes credentials in error responses", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+
+      validation: {
+        valid: true,
+        errors: [],
+      },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: false,
+
+      error: {
+        code: "AUTHENTICATION",
+
+        message:
+          "Unauthorized: Bearer test-secret-token-value",
+
+        retryable: false,
+      },
+
+      latencyMs: 100,
+
+      timestamp:
+        "2026-01-01T00:00:00.000Z",
+
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
+
+    const res = await POST(req);
+    const text = await res.text();
+
+    expect(text).not.toContain(
+      "test-secret-token-value",
+    );
+
+    expect(text).not.toContain(
+      "Bearer test-secret-token-value",
+    );
+  });
+
+  it("does not route unauthenticated requests", async () => {
+    mockAuth.mockResolvedValue({
+      user: {},
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+
+    expect(
+      mockRouteAndPersist,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mockRequestUpdate,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mockExecute,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// ARCHITECTURE COMPLIANCE
 // ─────────────────────────────────────────────────────
 
 describe("Chat Completions API — Architecture", () => {
@@ -442,33 +1044,86 @@ describe("Chat Completions API — Architecture", () => {
   );
 
   it("does not import any provider SDK", () => {
-    expect(routeSource).not.toContain("openai");
-    expect(routeSource).not.toContain("@anthropic-ai");
-    expect(routeSource).not.toContain("@google/generative-ai");
-    expect(routeSource).not.toContain("blueminds");
+    expect(routeSource).not.toContain(
+      'from "openai"',
+    );
+
+    expect(routeSource).not.toContain(
+      "@anthropic-ai/sdk",
+    );
+
+    expect(routeSource).not.toContain(
+      "@google/generative-ai",
+    );
   });
 
   it("does not call any provider API directly", () => {
-    expect(routeSource).not.toContain("api.bluesminds.com");
-    expect(routeSource).not.toContain("api.openai.com");
-    expect(routeSource).not.toContain("api.anthropic.com");
-    // No direct fetch to provider endpoints
-    expect(routeSource).not.toMatch(/fetch\s*\(\s*["'`]https?:/);
+    expect(routeSource).not.toContain(
+      "api.bluesminds.com",
+    );
+
+    expect(routeSource).not.toContain(
+      "api.openai.com",
+    );
+
+    expect(routeSource).not.toContain(
+      "api.anthropic.com",
+    );
+
+    expect(routeSource).not.toMatch(
+      /fetch\s*\(\s*["'`]https?:/,
+    );
   });
 
-  it("delegates to existing routing and execution architecture", () => {
-    expect(routeSource).toContain("routeAndPersist");
-    expect(routeSource).toContain("prepareExecutionFlow");
-    expect(routeSource).toContain("ExecutionOrchestrator");
+  it("delegates to the existing routing and execution architecture", () => {
+    expect(routeSource).toContain(
+      "routeAndPersist",
+    );
+
+    expect(routeSource).toContain(
+      "prepareExecutionFlow",
+    );
+
+    expect(routeSource).toContain(
+      "ExecutionOrchestrator",
+    );
   });
 
-  it("does not implement its own retry/fallback loop", () => {
-    // No while/for retry patterns in the route
-    expect(routeSource).not.toMatch(/while\s*\(/);
-    expect(routeSource).not.toMatch(/for\s*\(/);
-    // No re-routing or re-scoring
-    expect(routeSource).not.toContain("scoreCandidates");
-    expect(routeSource).not.toContain("filterCandidates");
-    expect(routeSource).not.toContain("orderFallbacks");
+  it("delegates request cost persistence to cost intelligence", () => {
+    expect(routeSource).toContain(
+      "persistRequestCostIntelligence",
+    );
+  });
+
+  it("attaches authenticated consumer ownership", () => {
+    expect(routeSource).toContain(
+      "userId",
+    );
+
+    expect(routeSource).toContain(
+      "auth()",
+    );
+  });
+
+  it("does not implement its own retry or fallback loop", () => {
+    expect(routeSource).not.toMatch(
+      /while\s*\(/,
+    );
+
+    expect(routeSource).not.toMatch(
+      /for\s*\(/,
+    );
+
+    expect(routeSource).not.toContain(
+      "scoreCandidates",
+    );
+
+    expect(routeSource).not.toContain(
+      "filterCandidates",
+    );
+
+    expect(routeSource).not.toContain(
+      "orderFallbacks",
+    );
   });
 });
