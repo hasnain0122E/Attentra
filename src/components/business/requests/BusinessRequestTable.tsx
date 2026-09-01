@@ -45,14 +45,13 @@ export default function BusinessRequestTable({
 }: BusinessRequestTableProps) {
   if (requests.length === 0) {
     return (
-      <section className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-16 text-center">
+      <section className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-14 text-center">
         <div className="font-reservation text-[25px] text-[var(--color-foreground)]">
           No matching requests.
         </div>
 
         <p className="mx-auto mt-2 max-w-[420px] text-[10px] leading-5 text-[var(--color-foreground-secondary)]">
-          Try changing the active search or
-          organization filters.
+          Try changing the active search or organization filters.
         </p>
       </section>
     );
@@ -60,6 +59,7 @@ export default function BusinessRequestTable({
 
   return (
     <section className="overflow-hidden rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)]">
+      {/* Desktop header */}
       <div className="hidden border-b border-[var(--color-border)] bg-[var(--color-surface-soft)]/45 px-5 py-3 xl:grid xl:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)_minmax(240px,1fr)_95px_105px_115px_26px] xl:items-center xl:gap-4">
         <HeaderLabel>Member</HeaderLabel>
         <HeaderLabel>Request</HeaderLabel>
@@ -75,9 +75,121 @@ export default function BusinessRequestTable({
           <Link
             key={request.id}
             href={`/business/requests/${request.id}`}
-            className="group block px-5 py-5 transition-colors hover:bg-[var(--color-surface-soft)]/45"
+            className="group block px-5 py-5 transition-colors hover:bg-[var(--color-surface-soft)]/35"
           >
-            <div className="grid gap-5 xl:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)_minmax(240px,1fr)_95px_105px_115px_26px] xl:items-center xl:gap-4">
+            {/* MOBILE / TABLET */}
+            <div className="xl:hidden">
+              {/* Identity */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[var(--color-surface-soft)] font-mono text-[8px] font-semibold text-[var(--color-foreground-secondary)]">
+                    {request.member.initials}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-semibold text-[var(--color-foreground)]">
+                      {request.member.name}
+                    </div>
+
+                    <div className="mt-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
+                      {request.apiKey.name}
+                    </div>
+                  </div>
+                </div>
+
+                <StatusBadge
+                  status={request.status}
+                />
+              </div>
+
+              {/* Task metadata */}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
+                  {request.taskType}
+                </span>
+
+                <span className="font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
+                  {request.complexity}
+                </span>
+              </div>
+
+              {/* Prompt */}
+              <p className="mt-4 line-clamp-2 text-[10px] font-medium leading-5 text-[var(--color-foreground)]">
+                {request.prompt}
+              </p>
+
+              <div className="mt-2 truncate font-mono text-[6px] tracking-[0.04em] text-[var(--color-foreground-muted)]">
+                {request.id}
+              </div>
+
+              {/* Compact model path */}
+              <div className="mt-5 grid grid-cols-2 gap-5">
+                <MobileMetric
+                  label="Routed"
+                  value={request.routedModel}
+                  detail={request.routedProvider}
+                />
+
+                <MobileMetric
+                  label="Executed"
+                  value={
+                    request.executedModel ??
+                    "—"
+                  }
+                  detail={
+                    request.executedProvider ??
+                    "No successful execution"
+                  }
+                  accent={
+                    request.fallbackUsed
+                  }
+                />
+              </div>
+
+              {/* Compact telemetry */}
+              <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-[var(--color-border)] pt-4">
+                <MobileMetric
+                  label="Latency"
+                  value={formatLatency(
+                    request.latencyMs,
+                  )}
+                />
+
+                <MobileMetric
+                  label="Tokens"
+                  value={String(
+                    request.totalTokens,
+                  )}
+                />
+
+                <MobileMetric
+                  label="Actual cost"
+                  value={formatCost(
+                    request.actualCost,
+                  )}
+                  accent={
+                    request.status !== "FAILED"
+                  }
+                />
+
+                <MobileMetric
+                  label="Created"
+                  value={formatDate(
+                    request.createdAt,
+                  )}
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <ArrowRight
+                  size={11}
+                  className="text-[var(--color-foreground-muted)] transition-transform duration-200 group-hover:translate-x-1 group-hover:text-[var(--color-accent)]"
+                />
+              </div>
+            </div>
+
+            {/* DESKTOP */}
+            <div className="hidden xl:grid xl:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)_minmax(240px,1fr)_95px_105px_115px_26px] xl:items-center xl:gap-4">
               {/* Member */}
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-soft)] font-mono text-[8px] font-semibold text-[var(--color-foreground-secondary)]">
@@ -122,14 +234,14 @@ export default function BusinessRequestTable({
 
               {/* Model path */}
               <div>
-                <MobileLabel>
-                  Model path
-                </MobileLabel>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2 xl:mt-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <ModelLabel
-                    model={request.routedModel}
-                    provider={request.routedProvider}
+                    model={
+                      request.routedModel
+                    }
+                    provider={
+                      request.routedProvider
+                    }
                   />
 
                   {request.fallbackUsed &&
@@ -155,33 +267,28 @@ export default function BusinessRequestTable({
                 </div>
 
                 {!request.fallbackUsed &&
-                  request.status !== "FAILED" && (
+                  request.status !==
+                    "FAILED" && (
                     <div className="mt-1 font-mono text-[6px] uppercase tracking-[0.07em] text-[var(--color-foreground-muted)]">
                       Routed & executed
                     </div>
                   )}
               </div>
 
-              <Metric
-                label="Latency"
+              <DesktopMetric
                 value={formatLatency(
                   request.latencyMs,
                 )}
               />
 
-              <Metric
-                label="Actual cost"
+              <DesktopMetric
                 value={formatCost(
                   request.actualCost,
                 )}
               />
 
               <div>
-                <MobileLabel>
-                  Created
-                </MobileLabel>
-
-                <div className="mt-2 text-[8px] text-[var(--color-foreground-secondary)] xl:mt-0">
+                <div className="text-[8px] text-[var(--color-foreground-secondary)]">
                   {formatDate(
                     request.createdAt,
                   )}
@@ -192,7 +299,7 @@ export default function BusinessRequestTable({
                 </div>
               </div>
 
-              <div className="hidden justify-end xl:flex">
+              <div className="flex justify-end">
                 <ArrowRight
                   size={12}
                   className="text-[var(--color-foreground-muted)] transition-transform duration-200 group-hover:translate-x-1 group-hover:text-[var(--color-accent)]"
@@ -218,32 +325,51 @@ function HeaderLabel({
   );
 }
 
-function MobileLabel({
-  children,
+function MobileMetric({
+  label,
+  value,
+  detail,
+  accent = false,
 }: {
-  children: ReactNode;
+  label: string;
+  value: string;
+  detail?: string;
+  accent?: boolean;
 }) {
   return (
-    <div className="font-mono text-[7px] uppercase tracking-[0.09em] text-[var(--color-foreground-muted)] xl:hidden">
-      {children}
+    <div className="min-w-0">
+      <div className="font-mono text-[6px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
+        {label}
+      </div>
+
+      <div
+        className={[
+          "mt-2 truncate text-[9px] font-medium",
+          accent
+            ? "text-[var(--color-accent)]"
+            : "text-[var(--color-foreground)]",
+        ].join(" ")}
+      >
+        {value}
+      </div>
+
+      {detail && (
+        <div className="mt-1 truncate font-mono text-[6px] uppercase tracking-[0.07em] text-[var(--color-foreground-muted)]">
+          {detail}
+        </div>
+      )}
     </div>
   );
 }
 
-function Metric({
-  label,
+function DesktopMetric({
   value,
 }: {
-  label: string;
   value: string;
 }) {
   return (
-    <div>
-      <MobileLabel>{label}</MobileLabel>
-
-      <div className="mt-2 font-mono text-[8px] text-[var(--color-foreground)] xl:mt-0">
-        {value}
-      </div>
+    <div className="font-mono text-[8px] text-[var(--color-foreground)]">
+      {value}
     </div>
   );
 }
@@ -284,7 +410,7 @@ function StatusBadge({
 }) {
   if (status === "FAILED") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
+      <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
         <WarningCircle size={8} />
         Failed
       </span>
@@ -293,7 +419,7 @@ function StatusBadge({
 
   if (status === "FALLBACK") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-accent)]">
+      <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-accent)]">
         <ArrowsClockwise size={8} />
         Fallback
       </span>
@@ -301,7 +427,7 @@ function StatusBadge({
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
+    <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
       <CheckCircle size={8} />
       Success
     </span>

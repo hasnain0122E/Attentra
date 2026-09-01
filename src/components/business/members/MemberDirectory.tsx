@@ -51,7 +51,7 @@ export default function MemberDirectory({
 }: MemberDirectoryProps) {
   if (members.length === 0) {
     return (
-      <section className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-16 text-center">
+      <section className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-14 text-center">
         <div className="font-reservation text-[25px] text-[var(--color-foreground)]">
           No matching members.
         </div>
@@ -66,6 +66,7 @@ export default function MemberDirectory({
 
   return (
     <section className="overflow-hidden rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)]">
+      {/* Header */}
       <div className="border-b border-[var(--color-border)] px-5 py-5 sm:px-6">
         <div className="font-mono text-[8px] uppercase tracking-[0.13em] text-[var(--color-accent)]">
           Member directory
@@ -82,43 +83,138 @@ export default function MemberDirectory({
         </p>
       </div>
 
-      <div className="hidden border-b border-[var(--color-border)] bg-[var(--color-surface-soft)]/40 px-5 py-3 xl:grid xl:grid-cols-[minmax(220px,1.4fr)_105px_105px_105px_110px_130px_90px] xl:items-center xl:gap-4 sm:px-6">
-        <HeaderLabel>
-          Member
-        </HeaderLabel>
-
-        <HeaderLabel>
-          Requests
-        </HeaderLabel>
-
-        <HeaderLabel>
-          Share
-        </HeaderLabel>
-
-        <HeaderLabel>
-          Fallback
-        </HeaderLabel>
-
-        <HeaderLabel>
-          Latency
-        </HeaderLabel>
-
-        <HeaderLabel>
-          Last active
-        </HeaderLabel>
-
-        <HeaderLabel>
-          Status
-        </HeaderLabel>
+      {/* Desktop header */}
+      <div className="hidden border-b border-[var(--color-border)] bg-[var(--color-surface-soft)]/40 px-6 py-3 xl:grid xl:grid-cols-[minmax(220px,1.4fr)_105px_105px_105px_110px_130px_90px] xl:items-center xl:gap-4">
+        <HeaderLabel>Member</HeaderLabel>
+        <HeaderLabel>Requests</HeaderLabel>
+        <HeaderLabel>Share</HeaderLabel>
+        <HeaderLabel>Fallback</HeaderLabel>
+        <HeaderLabel>Latency</HeaderLabel>
+        <HeaderLabel>Last active</HeaderLabel>
+        <HeaderLabel>Status</HeaderLabel>
       </div>
 
       <div className="divide-y divide-[var(--color-border)]">
         {members.map((member) => (
-          <div
+          <article
             key={member.id}
-            className="px-5 py-5 transition-colors hover:bg-[var(--color-surface-soft)]/35 sm:px-6"
+            className="px-5 py-5 transition-colors hover:bg-[var(--color-surface-soft)]/30 sm:px-6"
           >
-            <div className="grid gap-5 xl:grid-cols-[minmax(220px,1.4fr)_105px_105px_105px_110px_130px_90px] xl:items-center xl:gap-4">
+            {/* MOBILE / TABLET */}
+            <div className="xl:hidden">
+              {/* Identity row */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[var(--color-accent-soft)] font-mono text-[8px] font-semibold text-[var(--color-accent)]">
+                    {member.initials}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="truncate text-[11px] font-semibold text-[var(--color-foreground)]">
+                        {member.name}
+                      </div>
+
+                      <RoleBadge
+                        role={member.role}
+                      />
+                    </div>
+
+                    <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+                      <EnvelopeSimple
+                        size={9}
+                        className="shrink-0 text-[var(--color-foreground-muted)]"
+                      />
+
+                      <span className="truncate font-mono text-[7px] text-[var(--color-foreground-muted)]">
+                        {member.email}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <StatusBadge
+                  status={member.status}
+                />
+              </div>
+
+              {/* API key labels */}
+              {member.apiKeys.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5 pl-[52px]">
+                  {member.apiKeys.map(
+                    (apiKey) => (
+                      <span
+                        key={apiKey}
+                        className="rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.07em] text-[var(--color-foreground-muted)]"
+                      >
+                        {apiKey}
+                      </span>
+                    ),
+                  )}
+                </div>
+              )}
+
+              {/* Compact metrics */}
+              <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4">
+                <MobileMetric
+                  label="Requests"
+                  value={
+                    member.requestCount === 0
+                      ? "—"
+                      : member.requestCount.toLocaleString()
+                  }
+                />
+
+                <MobileMetric
+                  label="Request share"
+                  value={
+                    member.requestShare === 0
+                      ? "—"
+                      : `${member.requestShare.toFixed(1)}%`
+                  }
+                  accent={
+                    member.requestShare >= 20
+                  }
+                />
+
+                <MobileMetric
+                  label="Fallback"
+                  value={
+                    member.requestCount === 0
+                      ? "—"
+                      : `${member.fallbackRate.toFixed(1)}%`
+                  }
+                />
+
+                <MobileMetric
+                  label="Avg latency"
+                  value={formatLatency(
+                    member.avgLatencyMs,
+                  )}
+                />
+              </div>
+
+              {/* Last active footer */}
+              <div className="mt-5 flex items-center gap-2 border-t border-[var(--color-border)] pt-4">
+                <Clock
+                  size={10}
+                  className="shrink-0 text-[var(--color-foreground-muted)]"
+                />
+
+                <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
+                  Last active
+                </span>
+
+                <span className="ml-auto text-[8px] text-[var(--color-foreground-secondary)]">
+                  {formatLastActive(
+                    member.lastActiveAt,
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* DESKTOP */}
+            <div className="hidden xl:grid xl:grid-cols-[minmax(220px,1.4fr)_105px_105px_105px_110px_130px_90px] xl:items-center xl:gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[var(--color-accent-soft)] font-mono text-[8px] font-semibold text-[var(--color-accent)]">
                   {member.initials}
@@ -157,8 +253,7 @@ export default function MemberDirectory({
                 </div>
               </div>
 
-              <Metric
-                label="Requests"
+              <DesktopMetric
                 value={
                   member.requestCount === 0
                     ? "—"
@@ -166,8 +261,7 @@ export default function MemberDirectory({
                 }
               />
 
-              <Metric
-                label="Request share"
+              <DesktopMetric
                 value={
                   member.requestShare === 0
                     ? "—"
@@ -178,8 +272,7 @@ export default function MemberDirectory({
                 }
               />
 
-              <Metric
-                label="Fallback"
+              <DesktopMetric
                 value={
                   member.requestCount === 0
                     ? "—"
@@ -187,35 +280,30 @@ export default function MemberDirectory({
                 }
               />
 
-              <Metric
-                label="Avg latency"
+              <DesktopMetric
                 value={formatLatency(
                   member.avgLatencyMs,
                 )}
               />
 
-              <div>
-                <MobileLabel>
-                  Last active
-                </MobileLabel>
+              <div className="flex items-center gap-1.5 text-[8px] text-[var(--color-foreground-secondary)]">
+                <Clock
+                  size={9}
+                  className="shrink-0 text-[var(--color-foreground-muted)]"
+                />
 
-                <div className="mt-1.5 flex items-center gap-1.5 text-[8px] text-[var(--color-foreground-secondary)] xl:mt-0">
-                  <Clock
-                    size={9}
-                    className="shrink-0 text-[var(--color-foreground-muted)]"
-                  />
-
+                <span className="truncate">
                   {formatLastActive(
                     member.lastActiveAt,
                   )}
-                </div>
+                </span>
               </div>
 
               <StatusBadge
                 status={member.status}
               />
             </div>
-          </div>
+          </article>
         ))}
       </div>
     </section>
@@ -234,19 +322,7 @@ function HeaderLabel({
   );
 }
 
-function MobileLabel({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <div className="font-mono text-[7px] uppercase tracking-[0.09em] text-[var(--color-foreground-muted)] xl:hidden">
-      {children}
-    </div>
-  );
-}
-
-function Metric({
+function MobileMetric({
   label,
   value,
   accent = false,
@@ -257,13 +333,13 @@ function Metric({
 }) {
   return (
     <div>
-      <MobileLabel>
+      <div className="font-mono text-[6px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
         {label}
-      </MobileLabel>
+      </div>
 
       <div
         className={[
-          "mt-1.5 font-mono text-[9px] xl:mt-0",
+          "mt-2 font-mono text-[9px]",
           accent
             ? "text-[var(--color-accent)]"
             : "text-[var(--color-foreground)]",
@@ -271,6 +347,27 @@ function Metric({
       >
         {value}
       </div>
+    </div>
+  );
+}
+
+function DesktopMetric({
+  value,
+  accent = false,
+}: {
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "font-mono text-[9px]",
+        accent
+          ? "text-[var(--color-accent)]"
+          : "text-[var(--color-foreground)]",
+      ].join(" ")}
+    >
+      {value}
     </div>
   );
 }
@@ -305,7 +402,7 @@ function StatusBadge({
 }) {
   if (status === "ACTIVE") {
     return (
-      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-accent)]">
+      <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-accent)]">
         <CheckCircle size={8} />
         Active
       </span>
@@ -314,7 +411,7 @@ function StatusBadge({
 
   if (status === "INVITED") {
     return (
-      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
+      <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
         <EnvelopeSimple size={8} />
         Invited
       </span>
@@ -322,7 +419,7 @@ function StatusBadge({
   }
 
   return (
-    <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
+    <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
       <Prohibit size={8} />
       Inactive
     </span>
