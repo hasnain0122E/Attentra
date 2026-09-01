@@ -27,12 +27,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { routeAndPersist, prepareExecutionFlow } from "@/lib/routing";
 import type { RoutingErrorCode } from "@/lib/routing";
+import { persistRequestCostIntelligence } from "@/lib/cost-intelligence";
 import {
   ExecutionOrchestrator,
   sanitizeErrorMessage,
   type OrchestratorResult,
 } from "@/lib/execution";
-import type { ExecutionPlan, ExecutionResult } from "@/lib/routing/execution-plan";
+import type {
+  ExecutionPlan,
+  ExecutionResult,
+} from "@/lib/routing/execution-plan";
 import { prisma } from "@/lib/prisma";
 import { validateChatRequest } from "./validation";
 
@@ -87,10 +91,11 @@ function errorToHttpStatus(code: string): number {
 function buildSuccessResponse(
   requestId: string,
   result: OrchestratorResult,
-  plan: ExecutionPlan
+  plan: ExecutionPlan,
 ) {
-  const successfulAttempt =
-    result.executionAttempts.find((attempt) => attempt.success);
+  const successfulAttempt = result.executionAttempts.find(
+    (attempt) => attempt.success,
+  );
 
   return {
     success: true as const,
@@ -131,7 +136,7 @@ function buildSuccessResponse(
 function buildErrorResponse(
   requestId: string,
   error: { code: string; message: string; retryable: boolean },
-  fallback?: ExecutionResult["fallback"]
+  fallback?: ExecutionResult["fallback"],
 ) {
   const response: Record<string, unknown> = {
     success: false,
@@ -168,7 +173,7 @@ export async function POST(request: NextRequest) {
             message: "Content-Type must be application/json",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -186,7 +191,7 @@ export async function POST(request: NextRequest) {
             message: "Invalid JSON body",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -202,12 +207,17 @@ export async function POST(request: NextRequest) {
             message: validation.errors.join("; "),
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const { messages, maxTokens, taskTypeHint, policy, requestId: clientRequestId } =
-      validation.data;
+    const {
+      messages,
+      maxTokens,
+      taskTypeHint,
+      policy,
+      requestId: clientRequestId,
+    } = validation.data;
 
     // ── 4. Request ID ──────────────────────────────────
     const effectiveRequestId = clientRequestId || requestId;
@@ -218,12 +228,18 @@ export async function POST(request: NextRequest) {
         messages,
         maxTokens,
         taskTypeHint: taskTypeHint as
-          | "GENERAL" | "CODING" | "REASONING" | "WRITING"
-          | "SUMMARIZATION" | "TRANSLATION" | "ANALYSIS" | "EXTRACTION"
+          | "GENERAL"
+          | "CODING"
+          | "REASONING"
+          | "WRITING"
+          | "SUMMARIZATION"
+          | "TRANSLATION"
+          | "ANALYSIS"
+          | "EXTRACTION"
           | undefined,
         metadata: { requestId: effectiveRequestId },
       },
-      policy ? { policy } : undefined
+      policy ? { policy } : undefined,
     );
 
     if (!routingResult.success || !routingResult.decision) {
@@ -236,7 +252,7 @@ export async function POST(request: NextRequest) {
           message: routingResult.error ?? "Routing failed",
           retryable: false,
         }),
-        { status }
+        { status },
       );
     }
 
@@ -244,19 +260,17 @@ export async function POST(request: NextRequest) {
     const executionFlow = prepareExecutionFlow(
       routingResult,
       effectiveRequestId,
-      routingResult.persisted?.decisionId
+      routingResult.persisted?.decisionId,
     );
 
     if (!executionFlow.plan || executionFlow.status !== "NOT_EXECUTED") {
       return NextResponse.json(
         buildErrorResponse(effectiveRequestId, {
           code: "ROUTING_FAILED",
-          message:
-            executionFlow.error ??
-            "Failed to prepare execution plan",
+          message: executionFlow.error ?? "Failed to prepare execution plan",
           retryable: false,
         }),
-        { status: 502 }
+        { status: 502 },
       );
     }
 
@@ -267,16 +281,27 @@ export async function POST(request: NextRequest) {
       messages,
       // Prisma client lets the orchestrator's existing computeActualCost()
       // derive actual cost from real usage × the model's active pricing.
-      { prisma }
+      { prisma },
     );
 
     // ── 8. Return normalized response ──────────────────
     if (result.success) {
+      if (result.usage && result.modelId) {
+        await persistRequestCostIntelligence(prisma, {
+          requestId: effectiveRequestId,
+          executedModelId: result.modelId,
+          usage: {
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+          },
+          actualCost: result.actualCost,
+        });
+      }
+
       return NextResponse.json(
-        buildSuccessResponse(effectiveRequestId, result, executionFlow.plan)
+        buildSuccessResponse(effectiveRequestId, result, executionFlow.plan),
       );
     }
-
     const errorStatus = errorToHttpStatus(result.error?.code ?? "UNKNOWN");
     return NextResponse.json(
       buildErrorResponse(
@@ -286,9 +311,9 @@ export async function POST(request: NextRequest) {
           message: result.error?.message ?? "Execution failed",
           retryable: result.error?.retryable ?? false,
         },
-        result.fallback
+        result.fallback,
       ),
-      { status: errorStatus }
+      { status: errorStatus },
     );
   } catch (error) {
     // ── 9. Unexpected failure — never expose internals ──
@@ -304,7 +329,7 @@ export async function POST(request: NextRequest) {
           message: sanitizeErrorMessage(rawMessage),
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
