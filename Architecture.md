@@ -41,7 +41,6 @@ The architecture must support future providers such as:
 - Cohere
 - Groq
 - Together AI
-- OpenRouter
 - Other hosted or self-hosted models
 
 Adding a provider should require an adapter and model metadata, **not a rewrite of the routing engine**.

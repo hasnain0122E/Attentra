@@ -1,7 +1,7 @@
 /**
  * Attentra — Dispatcher Tests
  *
- * Phase 7 / Step 2 — Provider Execution Abstraction + BlueMinds Adapter
+ * Phase 7 / Step 2 — Provider Execution Abstraction
  *
  * Tests for the execution dispatcher:
  *

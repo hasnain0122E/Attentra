@@ -5,35 +5,63 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 
-const routingHealth = [
-  {
-    label: "Successful routing",
-    value: "94.1%",
-    detail: "12,085 completed requests",
-    icon: CheckCircle,
-    accent: true,
-  },
-  {
-    label: "Fallback usage",
-    value: "5.9%",
-    detail: "758 fallback executions",
-    icon: ArrowsClockwise,
-  },
-  {
-    label: "Failed requests",
-    value: "0.8%",
-    detail: "103 failed executions",
-    icon: WarningCircle,
-  },
-  {
-    label: "Routing decision",
-    value: "41ms",
-    detail: "average routing latency",
-    icon: Clock,
-  },
-];
+interface RoutingHealthData {
+  successRate: number;
+  fallbackRate: number;
+  avgDecisionTimeMs: number;
+  failedCount: number;
+}
 
-export default function BusinessRoutingHealth() {
+interface BusinessRoutingHealthProps {
+  health: RoutingHealthData;
+  totalRequests: number;
+}
+
+export default function BusinessRoutingHealth({
+  health,
+  totalRequests,
+}: BusinessRoutingHealthProps) {
+  const successCount = Math.round((health.successRate / 100) * totalRequests);
+  const fallbackCount = Math.round((health.fallbackRate / 100) * totalRequests);
+
+  const heading =
+    totalRequests === 0
+      ? "No routing data yet."
+      : health.successRate >= 90
+        ? "Organization routing is operating normally."
+        : "Organization routing is experiencing issues.";
+
+  const items = [
+    {
+      label: "Successful routing",
+      value: `${health.successRate.toFixed(1)}%`,
+      detail: `${successCount.toLocaleString()} completed requests`,
+      icon: CheckCircle,
+      accent: true,
+    },
+    {
+      label: "Fallback usage",
+      value: `${health.fallbackRate.toFixed(1)}%`,
+      detail: `${fallbackCount.toLocaleString()} fallback executions`,
+      icon: ArrowsClockwise,
+    },
+    {
+      label: "Failed requests",
+      value:
+        totalRequests > 0
+          ? `${((health.failedCount / totalRequests) * 100).toFixed(1)}%`
+          : "0%",
+      detail: `${health.failedCount.toLocaleString()} failed executions`,
+      icon: WarningCircle,
+    },
+    {
+      label: "Routing decision",
+      value: `${health.avgDecisionTimeMs}ms`,
+      detail: "average routing latency",
+      icon: Clock,
+    },
+  ];
+
   return (
     <section className="relative overflow-hidden rounded-[24px] bg-[var(--color-foreground)] p-5 text-white sm:p-6">
       <div
@@ -55,16 +83,16 @@ export default function BusinessRoutingHealth() {
         </div>
 
         <h2 className="mt-3 max-w-[350px] font-reservation text-[29px] leading-[0.95] tracking-[-0.03em] text-white">
-          Organization routing is operating normally.
+          {heading}
         </h2>
 
         <p className="mt-3 max-w-[390px] text-[9px] leading-5 text-white/50">
-          Routing, fallback activity, and execution
-          performance across the organization.
+          Routing, fallback activity, and execution performance across the
+          organization.
         </p>
 
         <div className="mt-7 space-y-2.5">
-          {routingHealth.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
 
             return (
@@ -81,10 +109,7 @@ export default function BusinessRoutingHealth() {
                         : "bg-white/[0.05] text-white/55",
                     ].join(" ")}
                   >
-                    <Icon
-                      size={14}
-                      weight="duotone"
-                    />
+                    <Icon size={14} weight="duotone" />
                   </div>
 
                   <div className="min-w-0">

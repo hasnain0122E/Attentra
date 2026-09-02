@@ -7,53 +7,49 @@ import { Check, Copy, Key, X } from "@phosphor-icons/react";
 interface CreateBusinessApiKeyModalProps {
   open: boolean;
   onClose: () => void;
+  businessId: string;
+  onCreated: () => void;
 }
-
-type Environment = "PRODUCTION" | "DEVELOPMENT" | "INTERNAL";
-
-const demoSecret = "attentra_demo_generated_once_7F4K2M9P";
 
 export default function CreateBusinessApiKeyModal({
   open,
   onClose,
+  businessId,
+  onCreated,
 }: CreateBusinessApiKeyModalProps) {
   const [name, setName] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(false);
 
-  const [environment, setEnvironment] = useState<Environment>("DEVELOPMENT");
-
-  const [created, setCreated] = useState(false);
-
+  const [rawKey, setRawKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     document.body.style.overflow = "hidden";
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
+      if (event.key === "Escape") onClose();
     }
 
     document.addEventListener("keydown", handleEscape);
 
     return () => {
       document.body.style.overflow = "";
-
       document.removeEventListener("keydown", handleEscape);
     };
   }, [open, onClose]);
-  if (!open) {
-    return null;
-  }
+
+  if (!open) return null;
 
   function reset() {
     setName("");
-    setEnvironment("DEVELOPMENT");
-    setCreated(false);
+    setExpiresAt("");
+    setSubmitting(false);
+    setError(false);
+    setRawKey(null);
     setCopied(false);
   }
 
@@ -62,19 +58,53 @@ export default function CreateBusinessApiKeyModal({
     onClose();
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!name.trim()) {
-      return;
-    }
+    if (!name.trim()) return;
 
-    setCreated(true);
+    setSubmitting(true);
+    setError(false);
+
+    try {
+      const body: Record<string, unknown> = { name: name.trim() };
+
+      if (expiresAt.trim()) {
+        body.expiresAt = new Date(expiresAt.trim()).toISOString();
+      }
+
+      const res = await fetch(
+        `/api/business/${businessId}/api-keys`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+
+      if (!res.ok) throw new Error("Create failed");
+
+      const json = (await res.json()) as {
+        success: boolean;
+        data: { rawKey: string };
+      };
+
+      if (!json.success) throw new Error("API error");
+
+      setRawKey(json.data.rawKey);
+      onCreated();
+    } catch (err) {
+      console.error("[api-keys] Create failed", err);
+      setError(true);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  async function copyDemoSecret() {
-    await navigator.clipboard.writeText(demoSecret);
+  async function copySecret() {
+    if (!rawKey) return;
 
+    await navigator.clipboard.writeText(rawKey);
     setCopied(true);
 
     window.setTimeout(() => {
@@ -121,7 +151,7 @@ export default function CreateBusinessApiKeyModal({
           </button>
         </div>
 
-        {!created ? (
+        {rawKey === null ? (
           <form onSubmit={handleSubmit} className="p-5 sm:p-6">
             <label
               htmlFor="business-key-name"
@@ -134,44 +164,29 @@ export default function CreateBusinessApiKeyModal({
               id="business-key-name"
               value={name}
               required
+              maxLength={100}
+              disabled={submitting}
               onChange={(event) => setName(event.target.value)}
               placeholder="Production backend"
-              className="mt-2 h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-4 text-[10px] text-[var(--color-foreground)] outline-none transition placeholder:text-[var(--color-foreground-muted)] focus:border-[var(--color-accent)]"
+              className="mt-2 h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-4 text-[10px] text-[var(--color-foreground)] outline-none transition placeholder:text-[var(--color-foreground-muted)] focus:border-[var(--color-accent)] disabled:opacity-50"
             />
 
             <div className="mt-5">
-              <div className="font-mono text-[8px] uppercase tracking-[0.09em] text-[var(--color-foreground-muted)]">
-                Environment
-              </div>
+              <label
+                htmlFor="business-key-expires"
+                className="font-mono text-[8px] uppercase tracking-[0.09em] text-[var(--color-foreground-muted)]"
+              >
+                Expires at (optional)
+              </label>
 
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {(
-                  ["PRODUCTION", "DEVELOPMENT", "INTERNAL"] as Environment[]
-                ).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setEnvironment(option)}
-                    className={[
-                      "rounded-xl border px-3 py-3 text-left transition",
-                      environment === option
-                        ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                        : "border-[var(--color-border)] bg-[var(--color-background)]",
-                    ].join(" ")}
-                  >
-                    <div
-                      className={[
-                        "font-mono text-[7px] uppercase tracking-[0.08em]",
-                        environment === option
-                          ? "text-[var(--color-accent)]"
-                          : "text-[var(--color-foreground-secondary)]",
-                      ].join(" ")}
-                    >
-                      {option}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <input
+                id="business-key-expires"
+                type="datetime-local"
+                value={expiresAt}
+                disabled={submitting}
+                onChange={(event) => setExpiresAt(event.target.value)}
+                className="mt-2 h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-4 text-[10px] text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)] disabled:opacity-50"
+              />
             </div>
 
             <div className="mt-6 rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background)] p-4">
@@ -181,43 +196,46 @@ export default function CreateBusinessApiKeyModal({
 
               <p className="mt-2 text-[9px] leading-5 text-[var(--color-foreground-secondary)]">
                 In production, the complete API key will be displayed only once.
-                Attentra should store only the secure key hash after creation.
+                Attentra stores only the secure key hash after creation.
               </p>
             </div>
+
+            {error && (
+              <div className="mt-4 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface-soft)] px-4 py-3 text-[9px] text-[var(--color-accent)]">
+                Unable to create API key. Please try again.
+              </div>
+            )}
 
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={closeModal}
-                className="h-10 rounded-xl border border-[var(--color-border)] px-5 text-[9px] text-[var(--color-foreground-secondary)]"
+                disabled={submitting}
+                className="h-10 rounded-xl border border-[var(--color-border)] px-5 text-[9px] text-[var(--color-foreground-secondary)] disabled:opacity-50"
               >
                 Cancel
               </button>
 
               <button
                 type="submit"
-                className="h-10 rounded-xl bg-[var(--color-foreground)] px-5 text-[9px] font-semibold text-white transition hover:opacity-90"
+                disabled={submitting || !name.trim()}
+                className="h-10 rounded-xl bg-[var(--color-foreground)] px-5 text-[9px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
               >
-                Create demo key
+                {submitting ? "Creating…" : "Create key"}
               </button>
             </div>
           </form>
         ) : (
           <div className="p-5 sm:p-6">
             <div className="rounded-[20px] bg-[var(--color-accent-soft)] p-5">
-              <Check
-                size={18}
-                weight="bold"
-                className="text-[var(--color-accent)]"
-              />
+              <Check size={18} weight="bold" className="text-[var(--color-accent)]" />
 
               <div className="mt-4 text-[13px] font-semibold text-[var(--color-foreground)]">
-                Demo credential prepared
+                API key created
               </div>
 
               <p className="mt-2 text-[9px] leading-5 text-[var(--color-foreground-secondary)]">
-                No real organization API key has been created. This demonstrates
-                the copy-once credential experience.
+                Copy this key now. It will not be shown again.
               </p>
 
               <div className="mt-5 rounded-[14px] bg-[var(--color-surface)] p-3.5">
@@ -227,12 +245,12 @@ export default function CreateBusinessApiKeyModal({
 
                 <div className="mt-2 flex items-center gap-3">
                   <code className="min-w-0 flex-1 break-all font-mono text-[8px] text-[var(--color-foreground)]">
-                    {demoSecret}
+                    {rawKey}
                   </code>
 
                   <button
                     type="button"
-                    onClick={copyDemoSecret}
+                    onClick={copySecret}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-foreground-muted)]"
                   >
                     {copied ? (

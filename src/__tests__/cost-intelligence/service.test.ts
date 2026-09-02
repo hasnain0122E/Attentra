@@ -10,6 +10,7 @@ function createPrismaMock() {
     },
     model: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
   };
 }
@@ -19,6 +20,7 @@ describe("persistRequestCostIntelligence", () => {
 
   beforeEach(() => {
     prisma = createPrismaMock();
+    delete process.env.CONSUMER_BASELINE_MODEL;
   });
 
   it("returns REQUEST_NOT_FOUND when the request does not exist", async () => {

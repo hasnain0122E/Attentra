@@ -1,33 +1,52 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import HistoryFilters from "./HistoryFilters";
 import HistoryTable from "./HistoryTable";
 
-import { requestHistory } from "@/lib/dashboard/history-data";
+import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
 export default function HistoryClient() {
+  const [requests, setRequests] = useState<RequestHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [taskType, setTaskType] = useState("ALL");
 
+  useEffect(() => {
+    fetch("/api/dashboard/requests")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load");
+        return res.json();
+      })
+      .then((data) => {
+        setRequests(data.requests ?? []);
+      })
+      .catch(() => {
+        setRequests([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
   const taskTypes = useMemo(() => {
     return Array.from(
       new Set(
-        requestHistory.map(
+        requests.map(
           (request) => request.taskType,
         ),
       ),
     ).sort();
-  }, []);
+  }, [requests]);
 
   const filteredRequests = useMemo(() => {
     const normalizedSearch = search
       .trim()
       .toLowerCase();
 
-    return requestHistory.filter((request) => {
+    return requests.filter((request) => {
       const matchesSearch =
         normalizedSearch.length === 0 ||
         request.prompt
@@ -57,7 +76,17 @@ export default function HistoryClient() {
         matchesTask
       );
     });
-  }, [search, status, taskType]);
+  }, [requests, search, status, taskType]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
+          Loading requests...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

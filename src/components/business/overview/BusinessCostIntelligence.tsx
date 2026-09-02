@@ -28,18 +28,17 @@ function formatCurrency(
   value: number,
 ): string {
   if (value === 0) {
-    return "$0.00";
+    return "$0.0000";
   }
 
-  if (Math.abs(value) < 0.01) {
-    return `${value < 0 ? "-" : ""}$${Math.abs(
-      value,
-    ).toFixed(4)}`;
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+
+  if (abs < 0.0001) {
+    return `${sign}$${abs.toFixed(6)}`;
   }
 
-  return `${value < 0 ? "-" : ""}$${Math.abs(
-    value,
-  ).toFixed(2)}`;
+  return `${sign}$${abs.toFixed(4)}`;
 }
 
 function formatPercentage(

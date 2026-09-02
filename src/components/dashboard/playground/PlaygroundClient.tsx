@@ -13,138 +13,202 @@ import DecisionDetail from "./DecisionDetail";
 import ExecutionTimeline from "./ExecutionTimeline";
 import ExecutionSummary from "./ExecutionSummary";
 
-import type { PlaygroundResultData } from "@/types/dashboard";
+import type {
+  ExecutionAttemptDisplayData,
+  PlaygroundResultData,
+} from "@/types/dashboard";
 
 const initialPrompt =
   "Explain why caching improves web application performance in two short sentences.";
 
-const mockResult: PlaygroundResultData = {
-  content:
-    "Caching improves web application performance by storing frequently requested data closer to where it is needed, reducing repeated computation and database or network access.\n\nThis lowers response time, reduces backend load, and allows the application to serve more users efficiently.",
+// ─────────────────────────────────────────────────────
+// API RESPONSE MAPPING
+// ─────────────────────────────────────────────────────
 
+/**
+ * Shape of the POST /api/v1/chat/completions success response.
+ *
+ * Only the fields we consume are typed here — the full
+ * response contract is defined by buildSuccessResponse() in the route.
+ */
+interface ChatCompletionsResponse {
+  success: boolean;
+  requestId: string;
+  content: string;
   routing: {
-    selectedModelId: "google-gemini-2.5-flash",
-    selectedModelIdentifier: "gemini-2.5-flash",
-    selectedModelDisplayName: "Gemini 2.5 Flash",
-    selectedProvider: "Google",
-    reason:
-      "Selected for strong reasoning support, suitable context capacity, low projected cost, and a high routing score for this low-complexity request.",
-    taskType: "REASONING",
-    complexity: "LOW",
-    projectedCost: 0.000646,
-
-    candidates: [
-      {
-        rank: 1,
-        modelIdentifier: "gemini-2.5-flash",
-        displayName: "Gemini 2.5 Flash",
-        provider: "Google",
-        score: 0.9997,
-        projectedCost: 0.000646,
-        selected: true,
-      },
-      {
-        rank: 2,
-        modelIdentifier: "claude-sonnet-5",
-        displayName: "Claude Sonnet 5",
-        provider: "Anthropic",
-        score: 0.9421,
-        projectedCost: 0.00112,
-        selected: false,
-      },
-      {
-        rank: 3,
-        modelIdentifier: "gpt-5-nano",
-        displayName: "GPT-5 Nano",
-        provider: "OpenAI",
-        score: 0.9014,
-        projectedCost: 0.00084,
-        selected: false,
-      },
-      {
-        rank: 4,
-        modelIdentifier: "gemini-2.5-pro",
-        displayName: "Gemini 2.5 Pro",
-        provider: "Google",
-        score: 0.8672,
-        projectedCost: 0.00214,
-        selected: false,
-      },
-      {
-        rank: 5,
-        modelIdentifier: "claude-haiku-4-5",
-        displayName: "Claude Haiku 4.5",
-        provider: "Anthropic",
-        score: 0.8216,
-        projectedCost: 0.00071,
-        selected: false,
-      },
-    ],
-  },
-
+    selectedModelId: string;
+    selectedModelIdentifier: string;
+    selectedModelDisplayName: string;
+    selectedProvider: string;
+    reason: string;
+    taskType: string;
+    complexity: string;
+    projectedCost: number;
+    candidates?: {
+      rank: number;
+      modelIdentifier: string;
+      displayName: string;
+      provider: string;
+      score: number;
+      projectedCost: number;
+      selected: boolean;
+    }[];
+  };
   execution: {
-    modelId: "anthropic-claude-sonnet-5",
-    modelIdentifier: "claude-sonnet-5",
-    displayName: "Claude Sonnet 5",
-    provider: "Anthropic",
-    fallbackUsed: true,
-
-    attempts: [
-      {
-        attempt: 1,
-        modelId: "google-gemini-2.5-flash",
-        modelIdentifier: "gemini-2.5-flash",
-        displayName: "Gemini 2.5 Flash",
-        provider: "Google",
-        success: false,
-        latencyMs: 418,
-        retryable: true,
-        errorCode: "MODEL_UNAVAILABLE",
-        errorMessage:
-          "The selected model was temporarily unavailable for execution.",
-      },
-      {
-        attempt: 2,
-        modelId: "anthropic-claude-sonnet-5",
-        modelIdentifier: "claude-sonnet-5",
-        displayName: "Claude Sonnet 5",
-        provider: "Anthropic",
-        success: true,
-        latencyMs: 1694,
-      },
-    ],
-
+    modelId: string;
+    modelIdentifier: string;
+    provider: string;
+    fallbackUsed: boolean;
+    attempts: number;
     usage: {
-      inputTokens: 25,
-      outputTokens: 89,
-      totalTokens: 114,
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+    };
+    latencyMs: number;
+    actualCost: number;
+  };
+  timestamp: string;
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  };
+}
+
+/**
+ * Map the real API response into PlaygroundResultData.
+ *
+ * The API does not include per-attempt details or routing candidates,
+ * so we synthesise display-safe attempt entries from the available
+ * routing + execution metadata.
+ */
+function mapApiResponse(data: ChatCompletionsResponse): PlaygroundResultData {
+  const {
+    routing: r,
+    execution: e,
+  } = data;
+
+  // ── Synthesise execution attempts ──────────────────
+  //
+  // The API returns attempts as a count. The playground timeline
+  // needs per-attempt display data. We reconstruct a plausible
+  // attempt list from routing (primary) and execution (actual).
+  const attempts: ExecutionAttemptDisplayData[] = [];
+
+  if (e.fallbackUsed) {
+    // Primary model failed → fallback model succeeded
+    attempts.push({
+      attempt: 1,
+      modelId: r.selectedModelId,
+      modelIdentifier: r.selectedModelIdentifier,
+      displayName: r.selectedModelDisplayName,
+      provider: r.selectedProvider,
+      success: false,
+      latencyMs: 0,
+      retryable: true,
+      errorCode: "EXECUTION_FAILED",
+      errorMessage: "Primary model execution failed.",
+    });
+
+    attempts.push({
+      attempt: 2,
+      modelId: e.modelId,
+      modelIdentifier: e.modelIdentifier,
+      displayName: e.modelIdentifier,
+      provider: e.provider,
+      success: true,
+      latencyMs: e.latencyMs,
+    });
+  } else {
+    // Primary model succeeded directly
+    attempts.push({
+      attempt: 1,
+      modelId: e.modelId,
+      modelIdentifier: e.modelIdentifier,
+      displayName: e.modelIdentifier,
+      provider: e.provider,
+      success: true,
+      latencyMs: e.latencyMs,
+    });
+  }
+
+  return {
+    content: data.content,
+
+    routing: {
+      selectedModelId: r.selectedModelId,
+      selectedModelIdentifier: r.selectedModelIdentifier,
+      selectedModelDisplayName: r.selectedModelDisplayName,
+      selectedProvider: r.selectedProvider,
+      reason: r.reason,
+      taskType: r.taskType,
+      complexity: r.complexity as PlaygroundResultData["routing"]["complexity"],
+      projectedCost: r.projectedCost,
+      candidates: r.candidates ?? [],
     },
 
-    latencyMs: 2112,
-    actualCost: 0.00098,
-  },
+    execution: {
+      modelId: e.modelId,
+      modelIdentifier: e.modelIdentifier,
+      displayName: e.modelIdentifier,
+      provider: e.provider,
+      fallbackUsed: e.fallbackUsed,
+      attempts,
+      usage: e.usage,
+      latencyMs: e.latencyMs,
+      actualCost: e.actualCost,
+    },
 
-  timestamp: "2026-08-30T12:00:00.000Z",
-};
+    timestamp: data.timestamp,
+  };
+}
 
 export default function PlaygroundClient() {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [result, setResult] = useState<PlaygroundResultData | null>(mockResult);
+  const [result, setResult] = useState<PlaygroundResultData | null>(null);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!prompt.trim() || loading) {
       return;
     }
 
     setLoading(true);
     setResult(null);
+    setError(null);
 
-    window.setTimeout(() => {
-      setResult(mockResult);
+    try {
+      const response = await fetch("/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: prompt.trim() }],
+        }),
+      });
+
+      const data: ChatCompletionsResponse = await response.json();
+
+      if (!response.ok || !data.success) {
+        const message =
+          data.error?.message ?? `Request failed (${response.status})`;
+        setError(message);
+        setLoading(false);
+        return;
+      }
+
+      setResult(mapApiResponse(data));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Network error — please check your connection and try again."
+      );
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   }
 
   return (
@@ -192,6 +256,18 @@ export default function PlaygroundClient() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="rounded-[24px] border border-[var(--color-accent)]/25 bg-[var(--color-surface)] p-5">
+          <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--color-accent)]">
+            Request failed
+          </div>
+
+          <p className="mt-2 text-[12px] leading-5 text-[var(--color-foreground-secondary)]">
+            {error}
+          </p>
         </div>
       )}
 

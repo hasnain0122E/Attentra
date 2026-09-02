@@ -29,7 +29,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { auth } from "@/auth";
+import { resolveRequester } from "@/lib/auth/resolve-requester";
 import { persistRequestCostIntelligence } from "@/lib/cost-intelligence";
 import {
   ExecutionOrchestrator,
@@ -42,6 +42,8 @@ import type {
   ExecutionPlan,
   ExecutionResult,
 } from "@/lib/routing/execution-plan";
+
+import type { RoutingDecision as RoutingDecisionType } from "@/lib/routing/types";
 
 import { validateChatRequest } from "./validation";
 
@@ -106,9 +108,23 @@ function buildSuccessResponse(
   requestId: string,
   result: OrchestratorResult,
   plan: ExecutionPlan,
+  routingDecision?: RoutingDecisionType,
 ) {
   const successfulAttempt = result.executionAttempts.find(
     (attempt) => attempt.success,
+  );
+
+  // ── Map routing candidates for playground / history ──
+  const candidates = (routingDecision?.candidates ?? []).map(
+    (score, index) => ({
+      rank: index + 1,
+      modelIdentifier: score.candidate.modelIdentifier,
+      displayName: score.candidate.displayName,
+      provider: score.candidate.providerName ?? score.candidate.providerId,
+      score: score.score,
+      projectedCost: score.factors.projectedCost,
+      selected: score.candidate.modelId === routingDecision?.selected.candidate.modelId,
+    }),
   );
 
   return {
@@ -127,6 +143,8 @@ function buildSuccessResponse(
       taskType: plan.taskType,
       complexity: plan.complexity,
       projectedCost: plan.projectedCost,
+
+      candidates,
     },
 
     execution: {
@@ -183,9 +201,11 @@ export async function POST(request: NextRequest) {
 
   try {
     // ── 1. Authentication ──────────────────────────────
-    const session = await auth();
+    //
+    // Unified resolver: Auth.js session first, then Bearer API key.
+    const requester = await resolveRequester(request.headers);
 
-    if (!session?.user?.id) {
+    if (requester.authType === "none") {
       return NextResponse.json(
         {
           success: false,
@@ -199,8 +219,6 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
-
-    const userId = session.user.id;
 
     // ── 2. Content-type guard ─────────────────────────
     const contentType = request.headers.get("content-type") ?? "";
@@ -315,23 +333,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 7. Attach authenticated consumer ownership ────
+    // ── 7. Attach request ownership ─────────────────
+    //
+    // Session requests: owned by the authenticated user.
+    // API-key requests: owned by the business workspace.
     //
     // routeAndPersist() owns routing persistence and intentionally
-    // does not depend on authentication. The consumer API attaches
-    // the trusted authenticated user after routing succeeds.
-    //
-    // This allows later consumer analytics/history queries to safely
-    // filter Request records by session.user.id.
+    // does not depend on authentication. The API attaches trusted
+    // ownership after routing succeeds.
     if (routingResult.persisted?.decisionId) {
+      const ownershipData: Record<string, string | null> = {};
+
+      if (requester.authType === "session") {
+        ownershipData.userId = requester.userId;
+      } else if (requester.authType === "apiKey") {
+        ownershipData.businessId = requester.businessId;
+        ownershipData.apiKeyId = requester.apiKeyId;
+        ownershipData.userId = null;
+      }
+
       await prisma.request.update({
         where: {
           id: effectiveRequestId,
         },
 
-        data: {
-          userId,
-        },
+        data: ownershipData,
       });
     }
 
@@ -391,11 +417,33 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // ── 10a. Persist prompt + response ────────────
+      const promptText = messages
+        .filter((m: { role: string }) => m.role === "user")
+        .map((m: { content: string }) => m.content)
+        .join("\n");
+
+      try {
+        await prisma.request.update({
+          where: { id: effectiveRequestId },
+          data: {
+            prompt: promptText || null,
+            response: result.content ?? null,
+            status: "SUCCESS",
+            latencyMs: result.latencyMs ?? null,
+          },
+        });
+      } catch {
+        // Best-effort — prompt/response/latency persistence must not
+        // fail the overall request.
+      }
+
       return NextResponse.json(
         buildSuccessResponse(
           effectiveRequestId,
           result,
           executionFlow.plan,
+          routingResult.decision,
         ),
       );
     }

@@ -9,163 +9,21 @@ import type { ReactNode } from "react";
 
 import Link from "next/link";
 
-interface RecentBusinessRequest {
-  id: string;
+import type { BusinessOverviewRecentRequest } from "@/lib/dashboard/business-overview-queries";
 
-  member: {
-    name: string;
-    initials: string;
-  };
-
-  taskType: string;
-
-  status:
-    | "SUCCESS"
-    | "FALLBACK"
-    | "FAILED";
-
-  routedModel: string;
-  routedProvider: string;
-
-  executedModel?: string;
-  executedProvider?: string;
-
-  fallbackUsed: boolean;
-
-  latencyMs: number;
-  createdAt: string;
+interface BusinessRecentRequestsProps {
+  items: BusinessOverviewRecentRequest[];
 }
 
-const recentRequests: RecentBusinessRequest[] = [
-  {
-    id: "biz_req_01J8V2D4N9K7F1A3",
-
-    member: {
-      name: "Hasnain Ali",
-      initials: "HA",
-    },
-
-    taskType: "REASONING",
-
-    status: "FALLBACK",
-
-    routedModel: "Gemini 2.5 Flash",
-    routedProvider: "Google",
-
-    executedModel: "Claude Sonnet 5",
-    executedProvider: "Anthropic",
-
-    fallbackUsed: true,
-
-    latencyMs: 2112,
-
-    createdAt:
-      "2026-08-31T11:28:00.000Z",
-  },
-
-  {
-    id: "biz_req_01J8V1Q6M3S9C8P2",
-
-    member: {
-      name: "Sara Khan",
-      initials: "SK",
-    },
-
-    taskType: "CODING",
-
-    status: "SUCCESS",
-
-    routedModel: "Claude Sonnet 5",
-    routedProvider: "Anthropic",
-
-    executedModel: "Claude Sonnet 5",
-    executedProvider: "Anthropic",
-
-    fallbackUsed: false,
-
-    latencyMs: 1842,
-
-    createdAt:
-      "2026-08-31T10:54:00.000Z",
-  },
-
-  {
-    id: "biz_req_01J8UZR8W7M5K4T9",
-
-    member: {
-      name: "Ahmed Raza",
-      initials: "AR",
-    },
-
-    taskType: "SUMMARIZATION",
-
-    status: "SUCCESS",
-
-    routedModel: "Gemini 2.5 Flash",
-    routedProvider: "Google",
-
-    executedModel: "Gemini 2.5 Flash",
-    executedProvider: "Google",
-
-    fallbackUsed: false,
-
-    latencyMs: 846,
-
-    createdAt:
-      "2026-08-31T10:31:00.000Z",
-  },
-
-  {
-    id: "biz_req_01J8UYD5Q2V8H6L1",
-
-    member: {
-      name: "Hamza Noor",
-      initials: "HN",
-    },
-
-    taskType: "ANALYSIS",
-
-    status: "FAILED",
-
-    routedModel: "Gemini 2.5 Pro",
-    routedProvider: "Google",
-
-    fallbackUsed: false,
-
-    latencyMs: 1438,
-
-    createdAt:
-      "2026-08-31T09:47:00.000Z",
-  },
-];
-
-function formatLatency(
-  value: number,
-) {
+function formatLatency(value: number) {
   if (value < 1000) {
     return `${value}ms`;
   }
 
-  return `${(
-    value / 1000
-  ).toFixed(2)}s`;
+  return `${(value / 1000).toFixed(2)}s`;
 }
 
-function formatDate(
-  value: string,
-) {
-  return new Intl.DateTimeFormat(
-    "en",
-    {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    },
-  ).format(new Date(value));
-}
-
-export default function BusinessRecentRequests() {
+export default function BusinessRecentRequests({ items }: BusinessRecentRequestsProps) {
   return (
     <section className="overflow-hidden rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)]">
       {/* Header */}
@@ -180,8 +38,7 @@ export default function BusinessRecentRequests() {
           </h2>
 
           <p className="mt-2 text-[9px] leading-5 text-[var(--color-foreground-secondary)]">
-            Latest routed requests across
-            organization members.
+            Latest routed requests across organization members.
           </p>
         </div>
 
@@ -194,9 +51,15 @@ export default function BusinessRecentRequests() {
         </Link>
       </div>
 
-      <div className="divide-y divide-[var(--color-border)]">
-        {recentRequests.map(
-          (request) => (
+      {items.length === 0 ? (
+        <div className="px-6 py-14 text-center">
+          <p className="text-[10px] leading-5 text-[var(--color-foreground-muted)]">
+            No recent requests to display.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-[var(--color-border)]">
+          {items.map((request) => (
             <Link
               key={request.id}
               href={`/business/requests/${request.id}`}
@@ -208,60 +71,36 @@ export default function BusinessRecentRequests() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[var(--color-surface-soft)] font-mono text-[7px] font-semibold text-[var(--color-foreground-secondary)]">
-                      {
-                        request.member
-                          .initials
-                      }
+                      {request.requesterInitials}
                     </div>
 
                     <div className="min-w-0">
                       <div className="truncate text-[10px] font-semibold text-[var(--color-foreground)]">
-                        {
-                          request.member
-                            .name
-                        }
+                        {request.requesterName}
                       </div>
 
                       <div className="mt-1 font-mono text-[6px] uppercase tracking-[0.09em] text-[var(--color-foreground-muted)]">
-                        {
-                          request.taskType
-                        }
+                        {request.taskType}
                       </div>
                     </div>
                   </div>
 
-                  <StatusBadge
-                    status={
-                      request.status
-                    }
-                  />
+                  <StatusBadge status={request.status} />
                 </div>
 
                 {/* Model path */}
                 <div className="mt-5 grid grid-cols-2 gap-5">
                   <CompactField
                     label="Routed"
-                    value={
-                      request.routedModel
-                    }
-                    detail={
-                      request.routedProvider
-                    }
+                    value={request.routedModel}
+                    detail={request.routedProvider}
                   />
 
                   <CompactField
                     label="Executed"
-                    value={
-                      request.executedModel ??
-                      "—"
-                    }
-                    detail={
-                      request.executedProvider ??
-                      "No successful execution"
-                    }
-                    accent={
-                      request.fallbackUsed
-                    }
+                    value={request.executedModel ?? "—"}
+                    detail={request.executedProvider ?? "No successful execution"}
+                    accent={request.fallbackUsed}
                   />
                 </div>
 
@@ -269,16 +108,12 @@ export default function BusinessRecentRequests() {
                 <div className="mt-5 grid grid-cols-2 gap-5 border-t border-[var(--color-border)] pt-4">
                   <CompactField
                     label="Latency"
-                    value={formatLatency(
-                      request.latencyMs,
-                    )}
+                    value={formatLatency(request.latencyMs)}
                   />
 
                   <CompactField
                     label="Created"
-                    value={formatDate(
-                      request.createdAt,
-                    )}
+                    value={request.createdAt}
                   />
                 </div>
               </div>
@@ -288,67 +123,45 @@ export default function BusinessRecentRequests() {
                 {/* Member */}
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[var(--color-surface-soft)] font-mono text-[7px] font-semibold text-[var(--color-foreground-secondary)]">
-                    {
-                      request.member
-                        .initials
-                    }
+                    {request.requesterInitials}
                   </div>
 
                   <div className="min-w-0">
                     <div className="truncate text-[9px] font-semibold text-[var(--color-foreground)]">
-                      {
-                        request.member
-                          .name
-                      }
+                      {request.requesterName}
                     </div>
 
                     <div className="mt-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
-                      {
-                        request.taskType
-                      }
+                      {request.taskType}
                     </div>
                   </div>
                 </div>
 
-                <StatusBadge
-                  status={request.status}
-                />
+                <StatusBadge status={request.status} />
 
                 {/* Model path */}
                 <div className="flex min-w-0 items-center gap-2">
                   <ModelLabel
-                    model={
-                      request.routedModel
-                    }
-                    provider={
-                      request.routedProvider
-                    }
+                    model={request.routedModel}
+                    provider={request.routedProvider}
                   />
 
-                  {request.fallbackUsed &&
-                    request.executedModel && (
-                      <>
-                        <ArrowRight
-                          size={9}
-                          className="shrink-0 text-[var(--color-accent)]"
-                        />
+                  {request.fallbackUsed && request.executedModel && (
+                    <>
+                      <ArrowRight
+                        size={9}
+                        className="shrink-0 text-[var(--color-accent)]"
+                      />
 
-                        <ModelLabel
-                          model={
-                            request.executedModel
-                          }
-                          provider={
-                            request.executedProvider ??
-                            ""
-                          }
-                          accent
-                        />
-                      </>
-                    )}
+                      <ModelLabel
+                        model={request.executedModel}
+                        provider={request.executedProvider ?? ""}
+                        accent
+                      />
+                    </>
+                  )}
 
-                  {!request.fallbackUsed &&
-                    request.status !==
-                      "FAILED" && (
+                  {!request.fallbackUsed && request.status !== "FAILED" && (
                     <span className="font-mono text-[6px] uppercase tracking-[0.07em] text-[var(--color-foreground-muted)]">
                       Routed & executed
                     </span>
@@ -357,16 +170,12 @@ export default function BusinessRecentRequests() {
 
                 <DesktopField
                   label="Latency"
-                  value={formatLatency(
-                    request.latencyMs,
-                  )}
+                  value={formatLatency(request.latencyMs)}
                 />
 
                 <DesktopField
                   label="Created"
-                  value={formatDate(
-                    request.createdAt,
-                  )}
+                  value={request.createdAt}
                 />
 
                 <ArrowRight
@@ -375,9 +184,9 @@ export default function BusinessRecentRequests() {
                 />
               </div>
             </Link>
-          ),
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -419,13 +228,7 @@ function CompactField({
   );
 }
 
-function DesktopField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DesktopField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
@@ -471,17 +274,12 @@ function ModelLabel({
 function StatusBadge({
   status,
 }: {
-  status:
-    | "SUCCESS"
-    | "FALLBACK"
-    | "FAILED";
+  status: "SUCCESS" | "FALLBACK" | "FAILED";
 }) {
   if (status === "FALLBACK") {
     return (
       <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-accent)]">
-        <ArrowsClockwise
-          size={8}
-        />
+        <ArrowsClockwise size={8} />
         Fallback
       </span>
     );
@@ -490,9 +288,7 @@ function StatusBadge({
   if (status === "FAILED") {
     return (
       <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface-soft)] px-2 py-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-secondary)]">
-        <WarningCircle
-          size={8}
-        />
+        <WarningCircle size={8} />
         Failed
       </span>
     );

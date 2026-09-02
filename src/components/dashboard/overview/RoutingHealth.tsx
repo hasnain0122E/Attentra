@@ -4,25 +4,45 @@ import {
   Lightning,
 } from "@phosphor-icons/react/dist/ssr";
 
+interface RoutingHealthProps {
+  successRate: number;
+  fallbackRate: number;
+  avgDecisionTimeMs: number;
+}
+
 const items = [
   {
     label: "Successful routing",
-    value: "93.7%",
+    key: "successRate" as const,
     icon: CheckCircle,
+    format: (v: number) => `${v.toFixed(1)}%`,
   },
   {
     label: "Fallback usage",
-    value: "6.3%",
+    key: "fallbackRate" as const,
     icon: ArrowsClockwise,
+    format: (v: number) => `${v.toFixed(1)}%`,
   },
   {
     label: "Avg. decision time",
-    value: "38 ms",
+    key: "avgDecisionTimeMs" as const,
     icon: Lightning,
+    format: (v: number) => v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(2)}s`,
   },
 ];
 
-export default function RoutingHealth() {
+export default function RoutingHealth({
+  successRate,
+  fallbackRate,
+  avgDecisionTimeMs,
+}: RoutingHealthProps) {
+  const values = { successRate, fallbackRate, avgDecisionTimeMs };
+
+  const heading = successRate >= 90
+    ? "Attentra is routing normally."
+    : successRate > 0
+      ? "Attentra routing is degraded."
+      : "No routing data yet.";
   return (
     <section className="relative overflow-hidden rounded-2xl bg-[var(--color-foreground)] p-5 text-white lg:p-6">
       <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full border border-white/[0.06]" />
@@ -34,7 +54,7 @@ export default function RoutingHealth() {
         </div>
 
         <h2 className="mt-2 max-w-[260px] font-reservation text-[27px] leading-[1.02] tracking-[-0.025em]">
-          Attentra is routing normally.
+          {heading}
         </h2>
 
         <div className="mt-8 space-y-2">
@@ -59,7 +79,7 @@ export default function RoutingHealth() {
                 </div>
 
                 <span className="font-mono text-[10px] text-white">
-                  {item.value}
+                  {item.format(values[item.key])}
                 </span>
               </div>
             );

@@ -7,7 +7,7 @@ import { loadEnvConfig } from "@next/env";
 // ─────────────────────────────────────────────────────
 // Vitest loads NO env files by itself — only `next dev` / `next build`
 // load them (via @next/env). Without this block, server-side integration
-// tests cannot see variables such as BLUEMINDS_API_KEY that live in
+// tests cannot see variables such as OPENAI_API_KEY that live in
 // .env.local. (DATABASE_URL only worked before because Prisma Client
 // loads .env — not .env.local — on its own.)
 //

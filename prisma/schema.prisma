@@ -202,6 +202,8 @@ model Request {
   userId            String?
   businessId        String?
   apiKeyId          String?
+  prompt            String?       @db.Text
+  response          String?       @db.Text
   taskType          String?
   complexity        Complexity?
   status            RequestStatus @default(PENDING)

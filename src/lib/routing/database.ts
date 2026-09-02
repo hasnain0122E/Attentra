@@ -30,6 +30,16 @@ import { prisma } from "@/lib/prisma";
 import type { ModelCandidate } from "./types";
 
 /**
+ * Supported execution providers.
+ *
+ * Only models belonging to these providers can become routing candidates.
+ * Historical Provider/Model records for removed providers (e.g., OpenRouter,
+ * BlueMinds) are preserved in the database for history but are excluded
+ * from active routing.
+ */
+const SUPPORTED_PROVIDERS = new Set(["openai", "anthropic", "google"]);
+
+/**
  * Result from loading routing candidates from the database.
  */
 export interface CandidateLoadResult {
@@ -93,6 +103,11 @@ export async function loadRoutingCandidates(): Promise<CandidateLoadResult> {
     const candidates: ModelCandidate[] = [];
 
     for (const model of models) {
+      // Skip models from unsupported (removed) providers
+      if (!SUPPORTED_PROVIDERS.has(model.provider.name)) {
+        continue;
+      }
+
       const snapshot = model.pricingSnapshots[0];
 
       if (!snapshot) {

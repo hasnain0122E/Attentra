@@ -2,13 +2,7 @@ import Link from "next/link";
 
 import { ArrowRight, Sparkle } from "@phosphor-icons/react/dist/ssr";
 
-import MetricCard from "@/components/dashboard/overview/MetricCard";
-import ModelActivity from "@/components/dashboard/overview/ModelActivity";
-import RecentRequests from "@/components/dashboard/overview/RecentRequests";
-import RoutingHealth from "@/components/dashboard/overview/RoutingHealth";
-import CostIntelligence from "@/components/dashboard/overview/CostIntelligence";
-
-import { overviewMetrics } from "@/lib/dashboard/mock-data";
+import DashboardOverviewClient from "@/components/dashboard/overview/DashboardOverviewClient";
 
 export default function DashboardPage() {
   return (
@@ -70,30 +64,8 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Metrics */}
-      <section className="grid gap-4 md:grid-cols-3">
-        {overviewMetrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            change={metric.change}
-            detail={metric.detail}
-          />
-        ))}
-      </section>
-
-      {/* Cost intelligence */}
-      <CostIntelligence />
-
-      {/* Routing intelligence */}
-      <section className="grid gap-4 xl:grid-cols-[1.4fr_0.8fr]">
-        <ModelActivity />
-        <RoutingHealth />
-      </section>
-
-      {/* Recent requests */}
-      <RecentRequests />
+      {/* Metrics + Cost Intelligence + Model Activity + Routing Health + Recent Requests */}
+      <DashboardOverviewClient />
     </div>
   );
 }

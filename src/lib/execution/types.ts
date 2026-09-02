@@ -117,7 +117,7 @@ export type ExecutionOptions = ExecutionConfig;
 /**
  * The provider-neutral execution contract (Phase 7 Step 3 canonical name).
  *
- * Each provider (BlueMinds, OpenAI, Anthropic, Google, Mock) implements
+ * Each provider (OpenAI, Anthropic, Google, Mock) implements
  * this interface. The execution layer interacts ONLY with this contract —
  * never with provider-specific API code.
  *

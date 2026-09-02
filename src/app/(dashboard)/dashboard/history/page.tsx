@@ -1,21 +1,11 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  ClockCounterClockwise,
 } from "@phosphor-icons/react/dist/ssr";
 
 import HistoryClient from "@/components/dashboard/history/HistoryClient";
-import { requestHistory } from "@/lib/dashboard/history-data";
 
 export default function HistoryPage() {
-  const fallbackCount = requestHistory.filter(
-    (request) => request.fallbackUsed,
-  ).length;
-
-  const failedCount = requestHistory.filter(
-    (request) => request.status === "FAILED",
-  ).length;
-
   return (
     <div className="space-y-7">
       <section className="flex flex-col gap-6 border-b border-[var(--color-border)] pb-7 xl:flex-row xl:items-end xl:justify-between">
@@ -48,52 +38,7 @@ export default function HistoryPage() {
         </Link>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <HistoryMetric
-          label="Requests"
-          value={String(requestHistory.length)}
-        />
-
-        <HistoryMetric
-          label="Fallbacks"
-          value={String(fallbackCount)}
-        />
-
-        <HistoryMetric
-          label="Failed"
-          value={String(failedCount)}
-        />
-      </section>
-
       <HistoryClient />
-    </div>
-  );
-}
-
-function HistoryMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-      <div>
-        <div className="font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
-          {label}
-        </div>
-
-        <div className="mt-1 font-reservation text-[24px] leading-none text-[var(--color-foreground)]">
-          {value}
-        </div>
-      </div>
-
-      <ClockCounterClockwise
-        size={17}
-        weight="duotone"
-        className="text-[var(--color-accent)]"
-      />
     </div>
   );
 }

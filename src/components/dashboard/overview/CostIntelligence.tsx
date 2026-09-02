@@ -25,14 +25,14 @@ function formatCurrency(
   value: number,
 ): string {
   if (value === 0) {
-    return "$0.00";
+    return "$0.0000";
   }
 
-  if (value < 0.01) {
-    return `$${value.toFixed(4)}`;
+  if (Math.abs(value) < 0.0001) {
+    return `$${value.toFixed(6)}`;
   }
 
-  return `$${value.toFixed(2)}`;
+  return `$${value.toFixed(4)}`;
 }
 
 function formatPercentage(

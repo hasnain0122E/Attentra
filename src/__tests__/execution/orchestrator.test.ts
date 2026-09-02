@@ -813,6 +813,9 @@ describe("Architecture compliance", () => {
     expect(src).not.toMatch(/if.*blueminds/i);
     expect(src).not.toMatch(/=== ["']blueminds["']/i);
     expect(src).not.toMatch(/=== ["']openai["']/i);
+    expect(src).not.toMatch(/=== ["']openrouter["']/i);
+    expect(src).not.toMatch(/=== ["']anthropic["']/i);
+    expect(src).not.toMatch(/=== ["']google["']/i);
   });
 
   it("orchestrator does NOT perform routing", () => {

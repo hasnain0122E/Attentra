@@ -350,13 +350,11 @@ describe("ExecutionService — Defaults and Neutrality", () => {
     const service = getExecutionService();
     const registry = service.getProviderRegistry();
 
-    expect(registry.has("blueminds")).toBe(true);
+    expect(registry.has("openai")).toBe(true);
     expect(registry.listProviderIds().sort()).toEqual([
       "anthropic",
-      "blueminds",
       "google",
       "openai",
-      "openrouter",
     ]);
   });
 

@@ -35,6 +35,7 @@ import type {
   RoutingTaskType,
   TokenEstimate,
   ProjectedCost,
+  ComplexityLevel,
 } from "./types";
 import { TASK_TYPE_TO_CAPABILITIES } from "./types";
 
@@ -84,27 +85,137 @@ function normalizeLowerBetter(value: number, min: number, max: number): number {
 }
 
 // ─────────────────────────────────────────────────────
+// COMPLEXITY-AWARE WEIGHT ADJUSTMENT
+// ─────────────────────────────────────────────────────
+
+/**
+ * Adjust policy weights based on request complexity.
+ *
+ * As complexity rises, capability/quality matters more and cost matters less.
+ * This ensures that:
+ *   - LOW:  cost/latency can dominate (cheap models preferred)
+ *   - MEDIUM: capability gets materially more weight
+ *   - HIGH: capability/quality dominates cost
+ *
+ * The modifiers are multiplicative — they scale the base policy weights
+ * and then re-normalize so they sum to the original total.
+ */
+function adjustWeightsForComplexity(
+  policy: RoutingPolicy,
+  complexity: ComplexityLevel
+): { costWeight: number; latencyWeight: number; capabilityWeight: number } {
+  let costMod: number;
+  let latencyMod: number;
+  let capabilityMod: number;
+
+  switch (complexity) {
+    case "LOW":
+      // Cost and latency dominate; capability matters less
+      costMod = 1.3;
+      latencyMod = 1.15;
+      capabilityMod = 0.55;
+      break;
+    case "MEDIUM":
+      // Balanced with a slight capability lean
+      costMod = 0.9;
+      latencyMod = 1.0;
+      capabilityMod = 1.3;
+      break;
+    case "HIGH":
+      // Capability dominates; cost is secondary
+      costMod = 0.1;
+      latencyMod = 0.2;
+      capabilityMod = 4.0;
+      break;
+    default:
+      costMod = 1.0;
+      latencyMod = 1.0;
+      capabilityMod = 1.0;
+  }
+
+  const rawCost = policy.costWeight * costMod;
+  const rawLatency = policy.latencyWeight * latencyMod;
+  const rawCapability = policy.capabilityWeight * capabilityMod;
+
+  // Re-normalize so weights sum to the original total
+  const originalSum = policy.costWeight + policy.latencyWeight + policy.capabilityWeight;
+  const rawSum = rawCost + rawLatency + rawCapability;
+
+  if (rawSum <= 0) {
+    return { costWeight: policy.costWeight, latencyWeight: policy.latencyWeight, capabilityWeight: policy.capabilityWeight };
+  }
+
+  const scale = originalSum / rawSum;
+  return {
+    costWeight: rawCost * scale,
+    latencyWeight: rawLatency * scale,
+    capabilityWeight: rawCapability * scale,
+  };
+}
+
+// ─────────────────────────────────────────────────────
+// TIER-BASED CAPABILITY BONUS
+// ─────────────────────────────────────────────────────
+
+/**
+ * Return a bonus added to capability score based on model tier and complexity.
+ *
+ * Higher-tier models (HEAVY > MID > LIGHT) get a larger bonus as complexity
+ * increases. At LOW complexity the bonus is negligible; at HIGH it is
+ * significant — giving stronger models a meaningful scoring advantage.
+ */
+function tierBonus(tier: string | undefined, complexity: ComplexityLevel): number {
+  let base: number;
+  switch (tier) {
+    case "HEAVY":  base = 0.12; break;
+    case "MID":    base = 0.06; break;
+    case "LIGHT":  base = 0.0;  break;
+    default:       base = 0.0;
+  }
+
+  switch (complexity) {
+    case "LOW":    return base * 0.3;   // negligible
+    case "MEDIUM": return base * 0.8;   // moderate
+    case "HIGH":   return base * 1.5;   // significant
+    default:       return 0.0;
+  }
+}
+
+// ─────────────────────────────────────────────────────
 // SCORING
 // ─────────────────────────────────────────────────────
 
 /**
  * Score a list of model candidates against a routing policy.
  *
+ * Weights are adjusted by complexity so that:
+ *   LOW  → cost/latency dominate
+ *   MEDIUM → capability gets materially more weight
+ *   HIGH → capability/quality dominates
+ *
+ * Model tier (LIGHT/MID/HEAVY) adds a complexity-scaled bonus to the
+ * capability score, giving stronger models an edge at higher complexity.
+ *
  * @param candidates    Models to score (must be pre-filtered / eligible)
  * @param policy        Weight configuration for scoring
  * @param taskType      Classified task type (for capability matching)
  * @param tokenEstimate Estimated token counts (for cost projection)
+ * @param complexity    Classified complexity level (default: "MEDIUM")
  * @returns             Scored candidates sorted by score descending
  */
 export function scoreCandidates(
   candidates: ModelCandidate[],
   policy: RoutingPolicy,
   taskType: RoutingTaskType,
-  tokenEstimate: TokenEstimate
+  tokenEstimate: TokenEstimate,
+  complexity: ComplexityLevel = "MEDIUM"
 ): ModelScore[] {
   if (candidates.length === 0) return [];
 
   const requiredCaps = TASK_TYPE_TO_CAPABILITIES[taskType] ?? [];
+
+  // Adjust weights for complexity
+  const weights = adjustWeightsForComplexity(policy, complexity);
 
   // Pre-compute projected costs for all candidates
   const projectedCosts = candidates.map((c) => calculateProjectedCost(c, tokenEstimate));
@@ -137,24 +248,37 @@ export function scoreCandidates(
     }
 
     // ── Capability score ──
+    //
+    // The capability score has two layers:
+    //   1. Base score (capped at 0.85): task capability match + breadth bonus
+    //   2. Tier bonus (up to +0.18): complexity-scaled model tier advantage
+    //
+    // Capping the base at 0.85 ensures the tier bonus can differentiate
+    // between models that all match the required capabilities equally.
+    // Without this cap, models with identical capabilities would all hit
+    // 1.0 and the tier bonus would be invisible.
     let capabilityScore: number;
     if (requiredCaps.length > 0) {
       const matchedCaps = requiredCaps.filter((cap) =>
         candidate.capabilities.includes(cap)
       );
       const matchRatio = matchedCaps.length / requiredCaps.length;
-      // Small bonus for broader capability coverage (max +0.2)
-      const breadthBonus = Math.min(candidate.capabilities.length * 0.03, 0.2);
-      capabilityScore = Math.min(matchRatio + breadthBonus, 1.0);
+      // Breadth bonus for broader capability coverage (max +0.15)
+      const breadthBonus = Math.min(candidate.capabilities.length * 0.02, 0.15);
+      // Base score capped at 0.85 to leave room for tier differentiation
+      const baseCap = Math.min(matchRatio * 0.7 + breadthBonus, 0.85);
+      // Tier-based bonus scaled by complexity
+      const tier = tierBonus(candidate.tier, complexity);
+      capabilityScore = Math.min(baseCap + tier, 1.0);
     } else {
       capabilityScore = 0.5;
     }
 
-    // ── Weighted total ──
+    // ── Weighted total (using complexity-adjusted weights) ──
     const score =
-      costScore * policy.costWeight +
-      latencyScore * policy.latencyWeight +
-      capabilityScore * policy.capabilityWeight;
+      costScore * weights.costWeight +
+      latencyScore * weights.latencyWeight +
+      capabilityScore * weights.capabilityWeight;
 
     return {
       candidate,

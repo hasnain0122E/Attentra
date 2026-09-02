@@ -32,14 +32,70 @@ function toModelPricing(model: {
 }
 
 /**
+ * Resolve the consumer baseline model from the CONSUMER_BASELINE_MODEL
+ * environment variable.
+ *
+ * The variable holds a modelIdentifier (e.g. "claude-sonnet-5").
+ * We look up the active model in the registry and return its pricing.
+ *
+ * Returns null when:
+ * - The env variable is missing/empty
+ * - No matching active model exists
+ * - The model has invalid pricing
+ */
+async function resolveConsumerBaselineModel(
+  prisma: PrismaClient,
+): Promise<{ id: string; inputPricePer1k: unknown; outputPricePer1k: unknown } | null> {
+  const identifier = process.env.CONSUMER_BASELINE_MODEL?.trim();
+
+  if (!identifier) {
+    return null;
+  }
+
+  const model = await prisma.model.findFirst({
+    where: {
+      modelIdentifier: identifier,
+      active: true,
+    },
+    select: {
+      id: true,
+      inputPricePer1k: true,
+      outputPricePer1k: true,
+    },
+  });
+
+  if (!model) {
+    return null;
+  }
+
+  /*
+   * Validate that pricing is resolvable before returning.
+   */
+  const inputPrice = Number(model.inputPricePer1k);
+  const outputPrice = Number(model.outputPricePer1k);
+
+  if (!Number.isFinite(inputPrice) || !Number.isFinite(outputPrice)) {
+    return null;
+  }
+
+  return model;
+}
+
+/**
  * Persist request-level execution and cost intelligence.
  *
  * Cost-intelligence failure must never invalidate a successful LLM execution.
  *
  * Baseline semantics:
- * The same actual token usage is priced against the business-configured
- * baseline model. This is an equivalent-usage cost comparison, not a claim
- * about what another provider would literally have generated.
+ * The same actual token usage is priced against the configured baseline model.
+ *
+ * Baseline resolution order:
+ * 1. Business requests: Business.baselineModelId (existing behavior)
+ * 2. Consumer requests: CONSUMER_BASELINE_MODEL env variable (model identifier)
+ * 3. No baseline: persist actual cost only, do not fabricate savings
+ *
+ * This is an equivalent-usage cost comparison, not a claim about what
+ * another provider would literally have generated.
  */
 export async function persistRequestCostIntelligence(
   prisma: PrismaClient,
@@ -102,46 +158,50 @@ export async function persistRequestCostIntelligence(
         ? input.actualCost
         : calculatedActualCost;
 
-    const baselineModelId = request.business?.baselineModelId;
-
     /*
-     * No baseline configured:
-     * Persist execution facts and actual cost, but do not fabricate savings.
+     * ── Baseline resolution ──────────────────────────────────────
+     *
+     * 1. Business baseline: Business.baselineModelId (highest priority)
+     * 2. Consumer baseline: CONSUMER_BASELINE_MODEL env variable
+     * 3. No baseline: persist execution facts only
      */
-    if (!baselineModelId) {
-      await prisma.request.update({
-        where: { id: input.requestId },
-        data: {
-          status: "SUCCESS",
-          selectedProviderId: executedModel.providerId,
-          selectedModelId: executedModel.id,
-          inputTokens: input.usage.inputTokens,
-          outputTokens: input.usage.outputTokens,
-          actualCost,
-          baselineCost: null,
-          savings: null,
-          savingsPercentage: null,
+    const businessBaselineModelId = request.business?.baselineModelId;
+
+    let baselineModelId: string | null = null;
+    let baselineModel: { id: string; inputPricePer1k: unknown; outputPricePer1k: unknown } | null = null;
+
+    if (businessBaselineModelId) {
+      /*
+       * Business baseline: look up by ID (existing behavior).
+       */
+      baselineModelId = businessBaselineModelId;
+
+      baselineModel = await prisma.model.findUnique({
+        where: { id: businessBaselineModelId },
+        select: {
+          id: true,
+          inputPricePer1k: true,
+          outputPricePer1k: true,
         },
       });
+    } else if (!request.businessId) {
+      /*
+       * Consumer baseline: resolve CONSUMER_BASELINE_MODEL identifier
+       * against the active model registry.
+       *
+       * Only applies to personal requests (businessId is null).
+       */
+      const consumerBaseline = await resolveConsumerBaselineModel(prisma);
 
-      return {
-        persisted: true,
-        reason: "BASELINE_NOT_CONFIGURED",
-      };
+      if (consumerBaseline) {
+        baselineModel = consumerBaseline;
+        baselineModelId = consumerBaseline.id;
+      }
     }
 
-    const baselineModel = await prisma.model.findUnique({
-      where: { id: baselineModelId },
-      select: {
-        id: true,
-        inputPricePer1k: true,
-        outputPricePer1k: true,
-      },
-    });
-
     /*
-     * A stale baseline reference should not destroy an otherwise successful
-     * execution. Persist the execution facts and actual cost only.
+     * No baseline resolved from either source:
+     * Persist execution facts and actual cost, but do not fabricate savings.
      */
     if (!baselineModel) {
       await prisma.request.update({
@@ -159,10 +219,16 @@ export async function persistRequestCostIntelligence(
         },
       });
 
+      const reason = businessBaselineModelId
+        ? "BASELINE_MODEL_NOT_FOUND"
+        : !request.businessId && process.env.CONSUMER_BASELINE_MODEL?.trim()
+          ? "CONSUMER_BASELINE_MODEL_NOT_FOUND"
+          : "BASELINE_NOT_CONFIGURED";
+
       return {
         persisted: true,
-        baselineModelId,
-        reason: "BASELINE_MODEL_NOT_FOUND",
+        baselineModelId: baselineModelId ?? undefined,
+        reason,
       };
     }
 
@@ -214,7 +280,7 @@ export async function persistRequestCostIntelligence(
 
     return {
       persisted: true,
-      baselineModelId,
+      baselineModelId: baselineModelId ?? undefined,
       costIntelligence,
     };
   } catch {

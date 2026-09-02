@@ -134,12 +134,13 @@ function executeRoutingPipeline(
     };
   }
 
-  // 6. Score eligible candidates
+  // 6. Score eligible candidates (complexity-aware weighting)
   const scored = scoreCandidates(
     eligible,
     policy,
     analysis.taskType,
-    analysis.tokenEstimate
+    analysis.tokenEstimate,
+    analysis.complexity.complexity
   );
 
   // 7. Select best candidate

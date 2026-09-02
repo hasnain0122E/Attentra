@@ -5,16 +5,14 @@
  *
  * Resolves providerId → ExecutionProvider for the execution layer:
  *
- *   "blueminds"  → BlueMinds execution provider   (operational, Step 2)
- *   "openai"     → OpenAI execution provider      (Step 1)
- *   "anthropic"  → Anthropic execution provider   (Step 1)
- *   "google"     → Google execution provider      (Step 1)
+ *   "openai"     → OpenAI execution provider
+ *   "anthropic"  → Anthropic execution provider
+ *   "google"     → Google execution provider
  *
  * The registry contains NO routing logic: the router has already selected
  * the provider/model; this layer only resolves the provider that executes
- * the already-selected target. Future providers (e.g., a dedicated
- * OpenAI-compatible gateway) can be added here without touching the
- * routing engine.
+ * the already-selected target. Future providers can be added here without
+ * touching the routing engine.
  *
  * Built on the Step 1 ExecutionAdapterRegistry (single source of truth for
  * provider storage) and exposed with the Step 3 ExecutionProvider naming.
@@ -22,11 +20,9 @@
 
 import { ExecutionAdapterRegistry } from "./registry";
 import type { ExecutionProvider } from "./types";
-import { createBlueMindsAdapter } from "./providers/blueminds";
 import { createOpenAIAdapter } from "./providers/openai";
 import { createAnthropicAdapter } from "./providers/anthropic";
 import { createGoogleAdapter } from "./providers/google";
-import { createOpenRouterAdapter } from "./providers/openrouter";
 
 export class ProviderRegistry {
   private readonly adapters: ExecutionAdapterRegistry;
@@ -86,19 +82,16 @@ export class ProviderRegistry {
 /**
  * Create the default production provider registry.
  *
- * Registers every provider adapter that exists from earlier Phase 7 work:
- * BlueMinds (operational execution backend) plus the OpenAI, Anthropic,
- * and Google adapters from Step 1. Adapters are safe to construct without
+ * Registers every supported provider adapter:
+ * OpenAI, Anthropic, and Google. Adapters are safe to construct without
  * credentials — they only fail (with structured errors) at execution time.
  */
 export function createDefaultProviderRegistry(): ProviderRegistry {
   const registry = new ProviderRegistry();
 
-  registry.register(createBlueMindsAdapter());
   registry.register(createOpenAIAdapter());
   registry.register(createAnthropicAdapter());
   registry.register(createGoogleAdapter());
-  registry.register(createOpenRouterAdapter());
 
   return registry;
 }

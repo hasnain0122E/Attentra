@@ -4,9 +4,19 @@ import {
   ArrowsClockwise,
   CheckCircle,
 } from "@phosphor-icons/react/dist/ssr";
-import { recentRequests } from "@/lib/dashboard/mock-data";
 
-export default function RecentRequests() {
+import type { OverviewRecentRequest } from "@/lib/dashboard/overview-queries";
+
+interface RecentRequestsProps {
+  items: OverviewRecentRequest[];
+}
+
+function formatLatency(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
+export default function RecentRequests({ items }: RecentRequestsProps) {
   return (
     <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
       <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4 lg:px-6">
@@ -64,7 +74,17 @@ export default function RecentRequests() {
           </thead>
 
           <tbody>
-            {recentRequests.map((request) => (
+            {items.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-6 py-8 text-center text-[10px] text-[var(--color-foreground-muted)]"
+                >
+                  No recent requests.
+                </td>
+              </tr>
+            ) : (
+              items.map((request) => (
               <tr
                 key={request.id}
                 className="border-b border-[var(--color-border)] last:border-b-0 transition-colors hover:bg-[var(--color-surface-soft)]"
@@ -75,7 +95,7 @@ export default function RecentRequests() {
                   </div>
 
                   <div className="mt-1 font-mono text-[8px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
-                    {request.time}
+                    {request.createdAt}
                   </div>
                 </td>
 
@@ -101,11 +121,11 @@ export default function RecentRequests() {
 
                 <td className="px-4 py-4">
                   <div className="text-[10px] font-medium text-[var(--color-foreground)]">
-                    {request.executedModel}
+                    {request.executedModel ?? "\u2014"}
                   </div>
 
                   <div className="mt-1 font-mono text-[8px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
-                    {request.executedProvider}
+                    {request.executedProvider ?? ""}
                   </div>
                 </td>
 
@@ -129,10 +149,11 @@ export default function RecentRequests() {
                 </td>
 
                 <td className="px-4 py-4 text-right font-mono text-[9px] text-[var(--color-foreground-secondary)]">
-                  {request.latency}
+                  {formatLatency(request.latencyMs)}
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>

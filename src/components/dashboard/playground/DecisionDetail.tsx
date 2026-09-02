@@ -38,9 +38,23 @@ const factors = [
   },
 ];
 
+function buildConciseReason(routing: RoutingDisplayData): string {
+  const selected = routing.candidates.find((c) => c.selected);
+  const scoreText = selected ? `routing score ${selected.score.toFixed(2)}` : "routing score";
+  const costText = `$${routing.projectedCost.toFixed(6)}`;
+
+  return (
+    `Selected ${routing.selectedModelDisplayName} for this ` +
+    `${routing.complexity.toLowerCase()}-complexity ${routing.taskType.toLowerCase()} request ` +
+    `based on capability, context fit, projected cost (${costText}), and ${scoreText}.`
+  );
+}
+
 export default function DecisionDetail({
   routing,
 }: DecisionDetailProps) {
+  const selected = routing.candidates.find((c) => c.selected);
+
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
       {/* Explanation */}
@@ -54,7 +68,7 @@ export default function DecisionDetail({
         </div>
 
         <p className="mt-5 max-w-[620px] text-[11px] leading-6 text-white/60">
-          {routing.reason}
+          {buildConciseReason(routing)}
         </p>
 
         <div className="mt-7 grid grid-cols-2 gap-2">
@@ -78,6 +92,30 @@ export default function DecisionDetail({
             </div>
           </div>
         </div>
+
+        {selected && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-3">
+              <div className="font-mono text-[7px] uppercase tracking-[0.1em] text-white/35">
+                Routing score
+              </div>
+
+              <div className="mt-2 font-mono text-[11px] font-medium">
+                {selected.score.toFixed(4)}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-3">
+              <div className="font-mono text-[7px] uppercase tracking-[0.1em] text-white/35">
+                Projected cost
+              </div>
+
+              <div className="mt-2 font-mono text-[11px] font-medium">
+                ${routing.projectedCost.toFixed(6)}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Factors */}

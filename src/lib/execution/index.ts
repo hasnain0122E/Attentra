@@ -15,7 +15,6 @@
  *
  *   // Create provider adapters
  *   import { createOpenAIAdapter, createAnthropicAdapter, createGoogleAdapter } from "@/lib/execution";
- *   import { createBlueMindsAdapter } from "@/lib/execution";
  *
  *   // Error handling
  *   import { NormalizedExecutionError, type ExecutionErrorCode } from "@/lib/execution";
@@ -79,36 +78,6 @@ export {
   createGoogleAdapter,
   GoogleExecutionAdapter,
 } from "./providers/google";
-
-// ─────────────────────────────────────────────────────
-// BLUEMINDS ADAPTER (Step 2)
-// ─────────────────────────────────────────────────────
-
-export {
-  createBlueMindsAdapter,
-  BlueMindsExecutionAdapter,
-  BLUEMINDS_PROVIDER_ID,
-  BLUEMINDS_PROVIDER_NAME,
-  DEFAULT_BLUEMINDS_BASE_URL,
-  DEFAULT_BLUEMINDS_TIMEOUT_MS,
-} from "./providers/blueminds";
-
-export type { BlueMindsConfig } from "./providers/blueminds";
-
-// ─────────────────────────────────────────────────
-// OPENROUTER ADAPTER (Phase 8 Step 1)
-// ─────────────────────────────────────────────────
-
-export {
-  createOpenRouterAdapter,
-  OpenRouterExecutionAdapter,
-  OPENROUTER_PROVIDER_ID,
-  OPENROUTER_PROVIDER_NAME,
-  DEFAULT_OPENROUTER_BASE_URL,
-  DEFAULT_OPENROUTER_TIMEOUT_MS,
-} from "./providers/openrouter";
-
-export type { OpenRouterConfig } from "./providers/openrouter";
 
 // ─────────────────────────────────────────────────────
 // MOCK ADAPTER

@@ -1,15 +1,11 @@
 "use client";
 
-import {
-  Warning,
-  X,
-} from "@phosphor-icons/react";
+import { Warning, X } from "@phosphor-icons/react";
 
-import type { BusinessApiKey } from "@/lib/business/api-key-data";
+import type { BusinessApiKeyData } from "./BusinessApiKeysClient";
 
 interface RevokeBusinessApiKeyModalProps {
-  apiKey: BusinessApiKey | null;
-
+  apiKey: BusinessApiKeyData | null;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -19,9 +15,7 @@ export default function RevokeBusinessApiKeyModal({
   onClose,
   onConfirm,
 }: RevokeBusinessApiKeyModalProps) {
-  if (!apiKey) {
-    return null;
-  }
+  if (!apiKey) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -35,10 +29,7 @@ export default function RevokeBusinessApiKeyModal({
       <div className="relative z-10 w-full max-w-[470px] rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_30px_100px_rgba(25,23,21,0.20)] sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-            <Warning
-              size={16}
-              weight="duotone"
-            />
+            <Warning size={16} weight="duotone" />
           </div>
 
           <button
@@ -59,9 +50,7 @@ export default function RevokeBusinessApiKeyModal({
           <span className="font-semibold text-[var(--color-foreground)]">
             {apiKey.name}
           </span>{" "}
-          would no longer be able to
-          authenticate with this
-          credential.
+          would no longer be able to authenticate with this credential.
         </p>
 
         <div className="mt-5 rounded-[16px] bg-[var(--color-background)] p-4">
@@ -74,7 +63,7 @@ export default function RevokeBusinessApiKeyModal({
           </div>
 
           <div className="mt-1 font-mono text-[7px] text-[var(--color-foreground-muted)]">
-            {apiKey.prefix}
+            {apiKey.keyPrefix}
           </div>
         </div>
 
@@ -92,13 +81,9 @@ export default function RevokeBusinessApiKeyModal({
             onClick={onConfirm}
             className="h-10 rounded-xl bg-[var(--color-foreground)] px-5 text-[9px] font-semibold text-white transition hover:opacity-90"
           >
-            Simulate revoke
+            Revoke credential
           </button>
         </div>
-
-        <p className="mt-4 text-center font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
-          Frontend demonstration only
-        </p>
       </div>
     </div>
   );

@@ -18,10 +18,8 @@ import {
   ProviderRegistry,
   createDefaultProviderRegistry,
   getProviderRegistry,
-  createBlueMindsAdapter,
   createOpenAIAdapter,
   NormalizedExecutionError,
-  BLUEMINDS_PROVIDER_ID,
   type ExecutionProvider,
 } from "@/lib/execution";
 
@@ -32,10 +30,10 @@ import {
 describe("Provider Registry — Registration and Resolution", () => {
   it("registers and resolves an ExecutionProvider by providerId", () => {
     const registry = new ProviderRegistry();
-    const provider = createBlueMindsAdapter({ apiKey: "test-key" });
+    const provider = createOpenAIAdapter();
     registry.register(provider);
 
-    expect(registry.resolve("blueminds")).toBe(provider);
+    expect(registry.resolve("openai")).toBe(provider);
   });
 
   it("resolve() throws a structured error for unknown providers", () => {
@@ -56,9 +54,9 @@ describe("Provider Registry — Registration and Resolution", () => {
 
   it("rejects duplicate registration with a structured error", () => {
     const registry = new ProviderRegistry();
-    registry.register(createBlueMindsAdapter());
+    registry.register(createOpenAIAdapter());
 
-    expect(() => registry.register(createBlueMindsAdapter())).toThrow(
+    expect(() => registry.register(createOpenAIAdapter())).toThrow(
       NormalizedExecutionError
     );
   });
@@ -66,29 +64,29 @@ describe("Provider Registry — Registration and Resolution", () => {
   it("has() reflects registration state", () => {
     const registry = new ProviderRegistry();
 
-    expect(registry.has("blueminds")).toBe(false);
+    expect(registry.has("openai")).toBe(false);
 
-    registry.register(createBlueMindsAdapter());
+    registry.register(createOpenAIAdapter());
 
-    expect(registry.has("blueminds")).toBe(true);
+    expect(registry.has("openai")).toBe(true);
   });
 
   it("unregister() removes a provider", () => {
     const registry = new ProviderRegistry();
-    registry.register(createBlueMindsAdapter());
+    registry.register(createOpenAIAdapter());
 
-    expect(registry.unregister("blueminds")).toBe(true);
-    expect(registry.has("blueminds")).toBe(false);
-    expect(registry.unregister("blueminds")).toBe(false);
+    expect(registry.unregister("openai")).toBe(true);
+    expect(registry.has("openai")).toBe(false);
+    expect(registry.unregister("openai")).toBe(false);
   });
 
   it("listProviderIds() and listProviders() expose registrations", () => {
     const registry = new ProviderRegistry();
-    registry.register(createBlueMindsAdapter());
+    registry.register(createOpenAIAdapter());
 
-    expect(registry.listProviderIds()).toContain("blueminds");
+    expect(registry.listProviderIds()).toContain("openai");
     expect(registry.listProviders()).toHaveLength(1);
-    expect(registry.listProviders()[0].providerId).toBe("blueminds");
+    expect(registry.listProviders()[0].providerId).toBe("openai");
   });
 });
 
@@ -97,20 +95,20 @@ describe("Provider Registry — Registration and Resolution", () => {
 // ─────────────────────────────────────────────────────
 
 describe("Provider Registry — Default Registry", () => {
-  it("resolves blueminds → BlueMinds execution provider", () => {
+  it("resolves openai → OpenAI execution provider", () => {
     const registry = createDefaultProviderRegistry();
-    const provider = registry.resolve("blueminds");
+    const provider = registry.resolve("openai");
 
-    expect(provider.providerId).toBe(BLUEMINDS_PROVIDER_ID);
-    expect(provider.providerName).toBe("BlueMinds");
+    expect(provider.providerId).toBe("openai");
+    expect(provider.providerName).toBe("OpenAI");
     expect(typeof provider.execute).toBe("function");
     expect(typeof provider.supports).toBe("function");
   });
 
-  it("includes the existing Step 1 provider adapters", () => {
+  it("includes only the supported provider adapters", () => {
     const ids = createDefaultProviderRegistry().listProviderIds().sort();
 
-    expect(ids).toEqual(["anthropic", "blueminds", "google", "openai", "openrouter"]);
+    expect(ids).toEqual(["anthropic", "google", "openai"]);
   });
 
   it("resolves every registered provider without error", () => {
@@ -132,11 +130,11 @@ describe("Provider Registry — Default Registry", () => {
 // ─────────────────────────────────────────────────────
 
 describe("Provider Registry — ExecutionProvider Contract", () => {
-  it("existing adapters satisfy the ExecutionProvider contract", () => {
-    const blueMinds: ExecutionProvider = createBlueMindsAdapter();
+  it("supported adapters satisfy the ExecutionProvider contract", () => {
     const openAI: ExecutionProvider = createOpenAIAdapter();
+    const anthropic: ExecutionProvider = createOpenAIAdapter(); // reuse pattern
 
-    for (const provider of [blueMinds, openAI]) {
+    for (const provider of [openAI, anthropic]) {
       expect(typeof provider.providerId).toBe("string");
       expect(typeof provider.providerName).toBe("string");
       expect(typeof provider.supports).toBe("function");

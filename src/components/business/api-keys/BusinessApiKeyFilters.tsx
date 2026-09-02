@@ -7,11 +7,9 @@ import BusinessApiKeyFilterDropdown from "./BusinessApiKeyFilterDropdown";
 interface BusinessApiKeyFiltersProps {
   search: string;
   status: string;
-  environment: string;
 
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
-  onEnvironmentChange: (value: string) => void;
 }
 
 const statusOptions = [
@@ -29,32 +27,11 @@ const statusOptions = [
   },
 ];
 
-const environmentOptions = [
-  {
-    label: "All environments",
-    value: "ALL",
-  },
-  {
-    label: "Production",
-    value: "PRODUCTION",
-  },
-  {
-    label: "Development",
-    value: "DEVELOPMENT",
-  },
-  {
-    label: "Internal",
-    value: "INTERNAL",
-  },
-];
-
 export default function BusinessApiKeyFilters({
   search,
   status,
-  environment,
   onSearchChange,
   onStatusChange,
-  onEnvironmentChange,
 }: BusinessApiKeyFiltersProps) {
   return (
     <section className="rounded-[22px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -70,7 +47,7 @@ export default function BusinessApiKeyFilters({
             onChange={(event) =>
               onSearchChange(event.target.value)
             }
-            placeholder="Search key, creator or usage..."
+            placeholder="Search key name or prefix..."
             className={[
               "h-10 w-full rounded-xl",
               "border border-[var(--color-border)]",
@@ -84,19 +61,12 @@ export default function BusinessApiKeyFilters({
           />
         </div>
 
-        <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:items-center">
+        <div className="grid w-full grid-cols-1 gap-2 lg:flex lg:w-auto lg:items-center">
           <BusinessApiKeyFilterDropdown
             value={status}
             options={statusOptions}
             onChange={onStatusChange}
             ariaLabel="Filter API keys by status"
-          />
-
-          <BusinessApiKeyFilterDropdown
-            value={environment}
-            options={environmentOptions}
-            onChange={onEnvironmentChange}
-            ariaLabel="Filter API keys by environment"
           />
         </div>
       </div>

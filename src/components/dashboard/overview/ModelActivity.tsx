@@ -1,6 +1,10 @@
-import { modelActivity } from "@/lib/dashboard/mock-data";
+import type { OverviewModelUsage } from "@/lib/dashboard/overview-queries";
 
-export default function ModelActivity() {
+interface ModelActivityProps {
+  items: OverviewModelUsage[];
+}
+
+export default function ModelActivity({ items }: ModelActivityProps) {
   return (
     <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 lg:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -20,12 +24,17 @@ export default function ModelActivity() {
       </div>
 
       <div className="mt-7 space-y-5">
-        {modelActivity.map((item) => (
-          <div key={item.model}>
+        {items.length === 0 ? (
+          <div className="py-6 text-center text-[10px] text-[var(--color-foreground-muted)]">
+            No model usage data yet.
+          </div>
+        ) : (
+          items.map((item) => (
+          <div key={item.modelId}>
             <div className="mb-2 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <div className="truncate text-[12px] font-medium text-[var(--color-foreground)]">
-                  {item.model}
+                  {item.displayName}
                 </div>
 
                 <div className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
@@ -51,7 +60,8 @@ export default function ModelActivity() {
               />
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </section>
   );

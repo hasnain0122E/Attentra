@@ -16,6 +16,8 @@ function formatCost(cost: number) {
 export default function CandidateRanking({
   candidates,
 }: CandidateRankingProps) {
+  const topCandidates = candidates.slice(0, 5);
+
   return (
     <section className="overflow-hidden rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)]">
       <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4 sm:px-6">
@@ -30,12 +32,12 @@ export default function CandidateRanking({
         </div>
 
         <div className="font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
-          Top {candidates.length}
+          Top {topCandidates.length}
         </div>
       </div>
 
       <div className="divide-y divide-[var(--color-border)]">
-        {candidates.map((candidate) => {
+        {topCandidates.map((candidate) => {
           const percentage = Math.max(
             0,
             Math.min(100, candidate.score * 100),

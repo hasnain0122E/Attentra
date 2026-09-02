@@ -35,14 +35,14 @@ import type { ExecutionPlan } from "@/lib/routing/execution-plan";
 // ─────────────────────────────────────────────────────
 
 const {
-  mockAuth,
+  mockResolveRequester,
   mockRouteAndPersist,
   mockPrepareExecutionFlow,
   mockExecute,
   mockRequestUpdate,
   mockPersistRequestCostIntelligence,
 } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+  mockResolveRequester: vi.fn(),
 
   mockRouteAndPersist: vi.fn(),
   mockPrepareExecutionFlow: vi.fn(),
@@ -58,10 +58,13 @@ const {
 // ─────────────────────────────────────────────────────
 
 /**
- * Never load the real Auth.js / NextAuth runtime in this unit test.
+ * Mock the unified requester resolver (Phase 12.3).
+ *
+ * By default returns a session-authenticated requester.
+ * Individual tests can override for API key or unauthenticated scenarios.
  */
-vi.mock("@/auth", () => ({
-  auth: mockAuth,
+vi.mock("@/lib/auth/resolve-requester", () => ({
+  resolveRequester: mockResolveRequester,
 }));
 
 /**
@@ -130,16 +133,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   /**
-   * All tests are authenticated by default.
+   * All tests are authenticated by default (session auth).
    *
    * Individual authentication tests can override this.
    */
-  mockAuth.mockResolvedValue({
-    user: {
-      id: "test-user-id",
-      email: "test@example.com",
-      name: "Test User",
-    },
+  mockResolveRequester.mockResolvedValue({
+    authType: "session",
+    userId: "test-user-id",
+    businessId: null,
+    apiKeyId: null,
   });
 
   mockRequestUpdate.mockResolvedValue({});
@@ -260,7 +262,9 @@ function makeRoutingSuccess() {
 
 describe("Chat Completions API — Authentication", () => {
   it("returns 401 when no authenticated user exists", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockResolveRequester.mockResolvedValue({
+      authType: "none",
+    });
 
     const req = makeRequest({
       messages: VALID_MESSAGES,
@@ -564,6 +568,206 @@ describe("Chat Completions API — Consumer Ownership", () => {
       mockRequestUpdate,
     ).not.toHaveBeenCalled();
   });
+
+  it("attaches businessId and apiKeyId for API-key authenticated requests", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "apiKey",
+      userId: null,
+      businessId: "biz-42",
+      apiKeyId: "key-7",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "err", retryable: false },
+      latencyMs: 100,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "apikey-ownership",
+    });
+
+    await POST(req);
+
+    expect(
+      mockRequestUpdate,
+    ).toHaveBeenCalledWith({
+      where: { id: "apikey-ownership" },
+      data: {
+        businessId: "biz-42",
+        apiKeyId: "key-7",
+        userId: null,
+      },
+    });
+  });
+
+  it("sets userId=null for API-key requests (no invented user)", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "apiKey",
+      userId: null,
+      businessId: "biz-1",
+      apiKeyId: "key-1",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "err", retryable: false },
+      latencyMs: 100,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "no-user-test",
+    });
+
+    await POST(req);
+
+    const call = mockRequestUpdate.mock.calls[0][0];
+    expect(call.data.userId).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// API KEY AUTHENTICATION
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — API Key Auth", () => {
+  it("allows request with valid API key (session absent)", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "apiKey",
+      userId: null,
+      businessId: "biz-1",
+      apiKeyId: "key-1",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "openai",
+      modelId: "model-1",
+      content: "API key response",
+      usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+      latencyMs: 200,
+      actualCost: 0.0001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "openai", modelId: "model-1", modelIdentifier: "gpt-4" },
+      ],
+    });
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const data = await parseJson(res);
+    expect(data.success).toBe(true);
+  });
+
+  it("rejects request when resolver returns none", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "none",
+    });
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+    const data = await parseJson(res);
+    expect(data.success).toBe(false);
+
+    const error = data.error as Record<string, unknown>;
+    expect(error.code).toBe("AUTHENTICATION");
+
+    expect(mockRouteAndPersist).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it("routing and execution behavior remains intact with API key auth", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "apiKey",
+      userId: null,
+      businessId: "biz-1",
+      apiKeyId: "key-1",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "model-x",
+      content: "Routed and executed via API key",
+      usage: { inputTokens: 20, outputTokens: 10, totalTokens: 30 },
+      latencyMs: 350,
+      actualCost: 0.0005,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "anthropic", modelId: "model-x", modelIdentifier: "claude-x" },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "full-pipeline-apikey",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const data = await parseJson(res);
+    expect(data.success).toBe(true);
+    expect(data.requestId).toBe("full-pipeline-apikey");
+    expect(data.content).toBe("Routed and executed via API key");
+
+    expect(mockRouteAndPersist).toHaveBeenCalled();
+    expect(mockExecute).toHaveBeenCalled();
+  });
 });
 
 // ─────────────────────────────────────────────────────
@@ -797,6 +1001,115 @@ describe("Chat Completions API — Execution", () => {
     );
   });
 
+  it("persists real execution latencyMs to the Request record on success", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "latency-model",
+      content: "Latency test response",
+      usage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+      latencyMs: 842,
+      actualCost: 0.001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        {
+          success: true,
+          providerId: "anthropic",
+          modelId: "latency-model",
+          modelIdentifier: "latency-model-id",
+        },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "latency-test",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Verify that prisma.request.update was called with latencyMs
+    const updateCalls = mockRequestUpdate.mock.calls;
+    const latencyUpdate = updateCalls.find(
+      (call: unknown[]) =>
+        call[0] &&
+        typeof call[0] === "object" &&
+        (call[0] as Record<string, unknown>).data &&
+        typeof (call[0] as Record<string, unknown>).data === "object" &&
+        "latencyMs" in ((call[0] as Record<string, unknown>).data as Record<string, unknown>),
+    );
+
+    expect(latencyUpdate).toBeDefined();
+    expect((latencyUpdate![0] as { data: { latencyMs: number } }).data.latencyMs).toBe(842);
+  });
+
+  it("persists latencyMs as null when orchestrator returns no latency", async () => {
+    mockRouteAndPersist.mockResolvedValue(
+      makeRoutingSuccess(),
+    );
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "no-latency-model",
+      content: "No latency response",
+      usage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+      actualCost: 0.001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        {
+          success: true,
+          providerId: "anthropic",
+          modelId: "no-latency-model",
+          modelIdentifier: "no-latency-model-id",
+        },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "no-latency-test",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Verify that prisma.request.update was called with latencyMs: null
+    const updateCalls = mockRequestUpdate.mock.calls;
+    const latencyUpdate = updateCalls.find(
+      (call: unknown[]) =>
+        call[0] &&
+        typeof call[0] === "object" &&
+        (call[0] as Record<string, unknown>).data &&
+        typeof (call[0] as Record<string, unknown>).data === "object" &&
+        "latencyMs" in ((call[0] as Record<string, unknown>).data as Record<string, unknown>),
+    );
+
+    expect(latencyUpdate).toBeDefined();
+    expect((latencyUpdate![0] as { data: { latencyMs: null } }).data.latencyMs).toBeNull();
+  });
+
   it("does not persist cost intelligence when execution fails", async () => {
     mockRouteAndPersist.mockResolvedValue(
       makeRoutingSuccess(),
@@ -998,8 +1311,8 @@ describe("Chat Completions API — Security", () => {
   });
 
   it("does not route unauthenticated requests", async () => {
-    mockAuth.mockResolvedValue({
-      user: {},
+    mockResolveRequester.mockResolvedValue({
+      authType: "none",
     });
 
     const req = makeRequest({
@@ -1095,13 +1408,9 @@ describe("Chat Completions API — Architecture", () => {
     );
   });
 
-  it("attaches authenticated consumer ownership", () => {
+  it("uses the unified requester resolver for authentication", () => {
     expect(routeSource).toContain(
-      "userId",
-    );
-
-    expect(routeSource).toContain(
-      "auth()",
+      "resolveRequester",
     );
   });
 

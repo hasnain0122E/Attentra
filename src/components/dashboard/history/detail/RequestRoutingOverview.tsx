@@ -15,10 +15,25 @@ interface RequestRoutingOverviewProps {
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "—";
+    return "\u2014";
   }
 
   return `$${value.toFixed(6)}`;
+}
+
+function buildConciseReason(request: RequestHistoryItem): string {
+  const scoreText = request.routingScore > 0
+    ? `routing score ${request.routingScore.toFixed(2)}`
+    : "routing score";
+  const costText = request.projectedCost !== undefined
+    ? `projected cost (${formatCost(request.projectedCost)})`
+    : "projected cost";
+
+  return (
+    `Selected ${request.routedModel} for this ` +
+    `${request.complexity.toLowerCase()}-complexity ${request.taskType.toLowerCase()} request ` +
+    `based on capability, context fit, ${costText}, and ${scoreText}.`
+  );
 }
 
 export default function RequestRoutingOverview({
@@ -82,7 +97,7 @@ export default function RequestRoutingOverview({
             </div>
 
             <p className="mt-4 text-[11px] leading-6 text-white/65">
-              {request.routingReason}
+              {buildConciseReason(request)}
             </p>
           </div>
 
