@@ -125,6 +125,48 @@ describe("getConsumerCostAnalytics", () => {
     expect(result.summary.averageCostPerRequest).toBe(0.0025);
   });
 
+  it("calculates aggregate savings percentage from total spend instead of averaging request percentages", async () => {
+  mockFindMany.mockResolvedValue([
+    requestFixture({
+      id: "req-small-baseline",
+      actualCost: 0.5,
+      baselineCost: 1,
+      savings: 0.5,
+      savingsPercentage: 50,
+    }),
+
+    requestFixture({
+      id: "req-large-baseline",
+      actualCost: 8.1,
+      baselineCost: 9,
+      savings: 0.9,
+      savingsPercentage: 10,
+    }),
+  ]);
+
+  const result =
+    await getConsumerCostAnalytics(
+      prisma,
+      "user-1",
+    );
+
+  expect(
+    result.summary.actualSpend,
+  ).toBe(8.6);
+
+  expect(
+    result.summary.baselineSpend,
+  ).toBe(10);
+
+  expect(
+    result.summary.savings,
+  ).toBe(1.4);
+
+  expect(
+    result.summary.savingsPercentage,
+  ).toBe(14);
+});
+
   it("aggregates baseline spend and savings only for comparable requests", async () => {
     mockFindMany.mockResolvedValue([
       requestFixture({

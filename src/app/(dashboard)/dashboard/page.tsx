@@ -6,13 +6,13 @@ import MetricCard from "@/components/dashboard/overview/MetricCard";
 import ModelActivity from "@/components/dashboard/overview/ModelActivity";
 import RecentRequests from "@/components/dashboard/overview/RecentRequests";
 import RoutingHealth from "@/components/dashboard/overview/RoutingHealth";
+import CostIntelligence from "@/components/dashboard/overview/CostIntelligence";
 
 import { overviewMetrics } from "@/lib/dashboard/mock-data";
 
 export default function DashboardPage() {
   return (
     <div className="space-y-7">
-      {/* Hero */}
       {/* Hero */}
       <section className="relative overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
         {/* Ambient copper glow */}
@@ -82,6 +82,9 @@ export default function DashboardPage() {
           />
         ))}
       </section>
+
+      {/* Cost intelligence */}
+      <CostIntelligence />
 
       {/* Routing intelligence */}
       <section className="grid gap-4 xl:grid-cols-[1.4fr_0.8fr]">

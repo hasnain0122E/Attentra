@@ -24,18 +24,15 @@ describe("persistRequestCostIntelligence", () => {
   it("returns REQUEST_NOT_FOUND when the request does not exist", async () => {
     prisma.request.findUnique.mockResolvedValue(null);
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_missing",
-        executedModelId: "model_exec",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.005,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_missing",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.005,
+    });
 
     expect(result).toEqual({
       persisted: false,
@@ -54,18 +51,15 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.model.findUnique.mockResolvedValueOnce(null);
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "missing_model",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.005,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "missing_model",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.005,
+    });
 
     expect(result).toEqual({
       persisted: false,
@@ -91,18 +85,15 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.request.update.mockResolvedValue({});
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "model_exec",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.005,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.005,
+    });
 
     expect(result).toEqual({
       persisted: true,
@@ -149,18 +140,15 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.request.update.mockResolvedValue({});
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "model_exec",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.005,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.005,
+    });
 
     expect(result.persisted).toBe(true);
     expect(result.baselineModelId).toBe("baseline_model");
@@ -212,18 +200,15 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.request.update.mockResolvedValue({});
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "expensive_model",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.05,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "expensive_model",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.05,
+    });
 
     expect(result.costIntelligence).toEqual({
       actualCost: 0.05,
@@ -257,18 +242,15 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.request.update.mockResolvedValue({});
 
-    await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "fallback_model",
-        usage: {
-          inputTokens: 800,
-          outputTokens: 200,
-        },
-        actualCost: 0.0054,
-      }
-    );
+    await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "fallback_model",
+      usage: {
+        inputTokens: 800,
+        outputTokens: 200,
+      },
+      actualCost: 0.0054,
+    });
 
     expect(prisma.request.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -277,7 +259,7 @@ describe("persistRequestCostIntelligence", () => {
           selectedModelId: "fallback_model",
           actualCost: 0.0054,
         }),
-      })
+      }),
     );
   });
 
@@ -301,18 +283,15 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.request.update.mockResolvedValue({});
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "model_exec",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.005,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.005,
+    });
 
     expect(result).toEqual({
       persisted: true,
@@ -347,44 +326,87 @@ describe("persistRequestCostIntelligence", () => {
 
     prisma.request.update.mockResolvedValue({});
 
-    await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "model_exec",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-      }
-    );
+    await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+    });
 
     expect(prisma.request.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           actualCost: 0.005,
         }),
-      })
+      }),
     );
+  });
+
+  it("persists zero cost for a successful zero-token execution", async () => {
+    prisma.request.findUnique.mockResolvedValue({
+      id: "req_zero",
+      businessId: null,
+      business: null,
+    });
+
+    prisma.model.findUnique.mockResolvedValueOnce({
+      id: "model_exec",
+      providerId: "google",
+      inputPricePer1k: 0.002,
+      outputPricePer1k: 0.006,
+    });
+
+    prisma.request.update.mockResolvedValue({});
+
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_zero",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+      },
+      actualCost: 0,
+    });
+
+    expect(result).toEqual({
+      persisted: true,
+      reason: "BASELINE_NOT_CONFIGURED",
+    });
+
+    expect(prisma.request.update).toHaveBeenCalledWith({
+      where: {
+        id: "req_zero",
+      },
+      data: {
+        status: "SUCCESS",
+        selectedProviderId: "google",
+        selectedModelId: "model_exec",
+        inputTokens: 0,
+        outputTokens: 0,
+        actualCost: 0,
+        baselineCost: null,
+        savings: null,
+        savingsPercentage: null,
+      },
+    });
   });
 
   it("never throws when persistence fails", async () => {
     prisma.request.findUnique.mockRejectedValue(
-      new Error("database unavailable")
+      new Error("database unavailable"),
     );
 
-    const result = await persistRequestCostIntelligence(
-      prisma as never,
-      {
-        requestId: "req_1",
-        executedModelId: "model_exec",
-        usage: {
-          inputTokens: 1000,
-          outputTokens: 500,
-        },
-        actualCost: 0.005,
-      }
-    );
+    const result = await persistRequestCostIntelligence(prisma as never, {
+      requestId: "req_1",
+      executedModelId: "model_exec",
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      actualCost: 0.005,
+    });
 
     expect(result).toEqual({
       persisted: false,
