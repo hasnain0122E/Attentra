@@ -134,3 +134,83 @@ export interface ConsumerCostAnalytics {
 
   trend: ConsumerCostTrendPoint[];
 }
+
+// ─────────────────────────────────────────────────────
+// BUSINESS COST ANALYTICS
+// ─────────────────────────────────────────────────────
+
+export interface BusinessCostSummary {
+  requestCount: number;
+  costBearingRequestCount: number;
+  comparableRequestCount: number;
+
+  actualSpend: number;
+  comparableActualSpend: number;
+  baselineSpend: number;
+
+  savings: number;
+  savingsPercentage: number;
+
+  averageCostPerRequest: number;
+  comparableSpendCoverage: number;
+
+  activeMemberCount: number;
+}
+
+export interface BusinessCostModelBreakdown {
+  modelId: string;
+  modelIdentifier: string;
+  displayName: string;
+  providerId: string;
+
+  requestCount: number;
+  actualSpend: number;
+  percentageOfSpend: number;
+}
+
+export interface BusinessCostProviderBreakdown {
+  providerId: string;
+  providerName: string;
+
+  requestCount: number;
+  actualSpend: number;
+  percentageOfSpend: number;
+}
+
+export interface BusinessCostTaskBreakdown {
+  taskType: string;
+
+  requestCount: number;
+  actualSpend: number;
+  percentageOfSpend: number;
+}
+
+export interface BusinessCostMemberBreakdown {
+  userId: string;
+  name: string | null;
+  email: string | null;
+
+  requestCount: number;
+  actualSpend: number;
+  percentageOfSpend: number;
+}
+
+export interface BusinessCostTrendPoint {
+  date: string;
+
+  requestCount: number;
+  actualSpend: number;
+  baselineSpend: number;
+  savings: number;
+}
+
+export interface BusinessCostAnalytics {
+  summary: BusinessCostSummary;
+
+  byModel: BusinessCostModelBreakdown[];
+  byProvider: BusinessCostProviderBreakdown[];
+  byTaskType: BusinessCostTaskBreakdown[];
+  byMember: BusinessCostMemberBreakdown[];
+
+  trend: BusinessCostTrendPoint[];
+}

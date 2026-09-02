@@ -22,6 +22,13 @@ export type {
   ConsumerCostTaskBreakdown,
   ConsumerCostTrendPoint,
   ConsumerCostAnalytics,
+  BusinessCostSummary,
+  BusinessCostModelBreakdown,
+  BusinessCostProviderBreakdown,
+  BusinessCostTaskBreakdown,
+  BusinessCostMemberBreakdown,
+  BusinessCostTrendPoint,
+  BusinessCostAnalytics,
 } from "./types";
 
 export type {
@@ -32,3 +39,11 @@ export type {
 export type {
   GetConsumerCostAnalyticsOptions,
 } from "./consumer";
+
+export {
+  getBusinessCostAnalytics,
+} from "./business";
+
+export type {
+  GetBusinessCostAnalyticsOptions,
+} from "./business";
