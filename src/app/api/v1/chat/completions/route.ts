@@ -45,6 +45,7 @@ import {
   type OrchestratorResult,
 } from "@/lib/execution";
 import { prisma } from "@/lib/prisma";
+import { buildConciseRoutingReason } from "@/lib/routing/explanations";
 import { prepareExecutionFlow, routeAndPersist } from "@/lib/routing";
 import type {
   ExecutionPlan,
@@ -149,7 +150,13 @@ function buildSuccessResponse(
       selectedModelDisplayName: plan.primary.displayName,
       selectedProvider: plan.primary.providerId,
 
-      reason: plan.routingExplanation,
+      // Concise, stable explanation (shared semantics with consumer/business UI).
+      // The full verbose explanation remains persisted internally on the RoutingDecision.
+      reason: buildConciseRoutingReason({
+        modelDisplayName: plan.primary.displayName,
+        complexity: plan.complexity,
+        taskType: plan.taskType,
+      }),
       taskType: plan.taskType,
       complexity: plan.complexity,
       projectedCost: plan.projectedCost,

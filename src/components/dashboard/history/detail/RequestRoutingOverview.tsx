@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 
 import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
+import { buildConciseRoutingReason } from "@/lib/routing/explanations";
 import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 interface RequestRoutingOverviewProps {
@@ -40,18 +41,11 @@ function formatLatency(value: number | null | undefined): string {
 }
 
 function buildConciseReason(request: RequestHistoryItem): string {
-  const scoreText = request.routingScore > 0
-    ? `routing score ${request.routingScore.toFixed(2)}`
-    : "routing score";
-  const costText = request.projectedCost !== undefined
-    ? `projected cost (${formatCost(request.projectedCost)})`
-    : "projected cost";
-
-  return (
-    `Selected ${request.routedModel} for this ` +
-    `${request.complexity.toLowerCase()}-complexity ${request.taskType.toLowerCase()} request ` +
-    `based on capability, context fit, ${costText}, and ${scoreText}.`
-  );
+  return buildConciseRoutingReason({
+    modelDisplayName: request.routedModel,
+    complexity: request.complexity,
+    taskType: request.taskType,
+  });
 }
 
 export default function RequestRoutingOverview({

@@ -38,6 +38,7 @@ export default function SignupForm() {
       variants={formVariants}
       initial="hidden"
       animate="visible"
+      onSubmit={(e) => e.preventDefault()}
       className="space-y-5"
     >
       {/* Google */}

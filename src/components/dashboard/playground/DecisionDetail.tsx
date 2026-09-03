@@ -7,6 +7,7 @@ import {
 
 import type { RoutingDisplayData } from "@/types/dashboard";
 
+import { buildConciseRoutingReason } from "@/lib/routing/explanations";
 import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 interface DecisionDetailProps {
@@ -41,15 +42,11 @@ const factors = [
 ];
 
 function buildConciseReason(routing: RoutingDisplayData): string {
-  const selected = routing.candidates.find((c) => c.selected);
-  const scoreText = selected ? `routing score ${selected.score.toFixed(2)}` : "routing score";
-  const costText = formatDisplayCurrency(routing.projectedCost);
-
-  return (
-    `Selected ${routing.selectedModelDisplayName} for this ` +
-    `${routing.complexity.toLowerCase()}-complexity ${routing.taskType.toLowerCase()} request ` +
-    `based on capability, context fit, projected cost (${costText}), and ${scoreText}.`
-  );
+  return buildConciseRoutingReason({
+    modelDisplayName: routing.selectedModelDisplayName,
+    complexity: routing.complexity,
+    taskType: routing.taskType,
+  });
 }
 
 export default function DecisionDetail({

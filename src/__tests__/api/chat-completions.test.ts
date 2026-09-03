@@ -973,6 +973,20 @@ describe("Chat Completions API — Execution", () => {
       0.001,
     );
 
+    // Phase 13 — routing.reason is the concise shared explanation
+    // (identical semantics to consumer/business UI), not the verbose
+    // internal routingExplanation (fallback catalogue + rejections).
+    expect(typeof routing.reason).toBe("string");
+
+    expect(routing.reason).toBe(
+      "Mock Model selected for a low-complexity general request " +
+        "based on capability, projected cost, and latency.",
+    );
+
+    expect(routing.reason).not.toContain("Fallbacks:");
+
+    expect(routing.reason).not.toContain("Excluded:");
+
     const execution =
       data.execution as Record<
         string,

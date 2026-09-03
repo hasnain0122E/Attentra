@@ -18,6 +18,37 @@
 import type { RoutingDecision, ModelScore, RejectedCandidate } from "./types";
 
 /**
+ * Build a concise, stable routing explanation from primitive
+ * routing facts.
+ *
+ * This is the canonical concise explanation used consistently by
+ * the consumer UI, the business UI, and the public API
+ * (`routing.reason`). It deliberately excludes fallback catalogues,
+ * rejection summaries, and formatted currency so a single sentence
+ * shape is preserved across all surfaces; numeric projected cost and
+ * routing score are exposed as separate structured fields.
+ *
+ * @param input.modelDisplayName  Display name of the selected model
+ * @param input.complexity        Complexity label (e.g. "LOW", "MEDIUM", "HIGH")
+ * @param input.taskType          Task type label (e.g. "GENERAL", "CODING")
+ * @returns                       Concise explanation string
+ */
+export function buildConciseRoutingReason(input: {
+  modelDisplayName: string;
+  complexity: string;
+  taskType: string;
+}): string {
+  const complexityLabel = input.complexity.toLowerCase();
+  const taskTypeLabel = input.taskType.toLowerCase();
+
+  return (
+    `${input.modelDisplayName} selected for a ` +
+    `${complexityLabel}-complexity ${taskTypeLabel} request ` +
+    `based on capability, projected cost, and latency.`
+  );
+}
+
+/**
  * Generate a human-readable explanation for a routing decision.
  *
  * @param decision  The routing decision to explain

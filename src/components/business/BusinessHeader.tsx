@@ -16,8 +16,6 @@ interface BusinessHeaderProps {
 const pageNames: Record<string, string> = {
   "/business": "Overview",
   "/business/requests": "Requests",
-  "/business/routing": "Routing",
-  "/business/models": "Models",
   "/business/members": "Members",
   "/business/api-keys": "API keys",
   "/business/billing": "Billing",

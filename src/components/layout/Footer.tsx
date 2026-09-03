@@ -183,19 +183,17 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <a
-              href="#"
-              className="text-[10px] text-[var(--color-foreground-muted)] transition-colors hover:text-[var(--color-foreground)]"
+            <span
+              className="text-[10px] text-[var(--color-foreground-muted)]"
             >
               Privacy
-            </a>
+            </span>
 
-            <a
-              href="#"
-              className="text-[10px] text-[var(--color-foreground-muted)] transition-colors hover:text-[var(--color-foreground)]"
+            <span
+              className="text-[10px] text-[var(--color-foreground-muted)]"
             >
               Terms
-            </a>
+            </span>
 
             <a
               href="#top"

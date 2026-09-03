@@ -5,6 +5,7 @@ import {
 
 import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
 
+import { buildConciseRoutingReason } from "@/lib/routing/explanations";
 import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 interface BusinessRequestRoutingProps {
@@ -37,21 +38,15 @@ function formatLatency(value: number | null | undefined): string {
 
 /**
  * Build a concise, human-readable routing explanation from persisted data.
- * Uses the same pattern as the consumer RequestRoutingOverview component.
+ * Delegates to the shared routing-domain helper so consumer UI, business UI,
+ * and the public API all share the same explanation semantics.
  */
 function buildConciseReason(request: BusinessRequestHistoryItem): string {
-  const scoreText = request.routingScore > 0
-    ? `routing score ${request.routingScore.toFixed(2)}`
-    : "routing score";
-  const costText = request.projectedCost !== undefined
-    ? `projected cost (${formatCost(request.projectedCost)})`
-    : "projected cost";
-
-  return (
-    `${request.routedModel} was selected for this ` +
-    `${request.complexity.toLowerCase()}-complexity ${request.taskType.toLowerCase()} request ` +
-    `based on capability, latency, and ${costText}.`
-  );
+  return buildConciseRoutingReason({
+    modelDisplayName: request.routedModel,
+    complexity: request.complexity,
+    taskType: request.taskType,
+  });
 }
 
 export default function BusinessRequestRouting({

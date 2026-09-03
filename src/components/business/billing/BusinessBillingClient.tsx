@@ -231,6 +231,7 @@ export default function BusinessBillingClient() {
         <div className="flex items-center gap-2">
           <input
             type="date"
+            aria-label="Billing period start date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--color-foreground)]"
@@ -238,6 +239,7 @@ export default function BusinessBillingClient() {
           <span className="font-mono text-[9px] text-[var(--color-foreground-muted)]">to</span>
           <input
             type="date"
+            aria-label="Billing period end date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--color-foreground)]"

@@ -1,13 +1,13 @@
 /**
  * Attentra — Internal Pricing Sync API Route
  *
- * POST /api/internal/pricing-sync
+ * POST /api/internal/pricing-sync  — manual invocation
+ * GET  /api/internal/pricing-sync  — Vercel Cron (vercel.json crons send GET)
  *
- * Triggered by Vercel Cron Jobs (every 10 hours) or manual invocation.
  * Secured by CRON_SECRET environment variable.
  *
  * Architecture: Deployment-compatible scheduler.
- * Vercel cron → POST this route with Authorization: Bearer <CRON_SECRET>
+ * Vercel cron → GET/POST this route with Authorization: Bearer <CRON_SECRET>
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +16,7 @@ import { syncAllPricing } from "@/lib/pricing/sync-service";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+async function handlePricingSync(request: NextRequest) {
   // Verify authorization
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
@@ -60,4 +60,13 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Vercel Cron Jobs send GET requests; manual invocations use POST.
+export async function GET(request: NextRequest) {
+  return handlePricingSync(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handlePricingSync(request);
 }
