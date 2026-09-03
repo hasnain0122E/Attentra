@@ -2,13 +2,15 @@
  * Attentra — API Key Backend Foundation Tests
  *
  * Phase 12.2 — Security + correctness tests for the API key module.
+ * Phase 12.13.1 — Personal API Key ownership tests.
  *
  * Coverage:
  *   GENERATION   — prefix, uniqueness, entropy, hash determinism
  *   CREATION     — persistence, input validation, one-time raw key
  *   VALIDATION   — happy path, malformed, not found, revoked, expired
  *   REVOCATION   — ownership scoping, idempotency
- *   LISTING      — business scoping, no secret leakage
+ *   LISTING      — business/personal scoping, no secret leakage
+ *   PERSONAL     — create, list, revoke, validation
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,9 +23,12 @@ import {
   buildKeyPrefix,
   isPlausibleApiKey,
   createBusinessApiKey,
+  createPersonalApiKey,
   validateApiKey,
   revokeBusinessApiKey,
+  revokePersonalApiKey,
   listBusinessApiKeys,
+  listPersonalApiKeys,
 } from "@/lib/api-keys";
 
 // ─────────────────────────────────────────────────────
@@ -34,7 +39,7 @@ import {
  * Build a minimal mock Prisma client that simulates the ApiKey table.
  *
  * The mock stores records in memory and supports:
- *   apiKey.create, findUnique, updateMany, findMany
+ *   apiKey.create, findUnique, updateMany, findMany, update
  */
 function createMockPrisma() {
   const store: Map<string, Record<string, unknown>> = new Map();
@@ -45,7 +50,8 @@ function createMockPrisma() {
         const id = `key-${store.size + 1}`;
         const record = {
           id,
-          businessId: data.businessId,
+          userId: data.userId ?? null,
+          businessId: data.businessId ?? null,
           name: data.name,
           keyHash: data.keyHash,
           keyPrefix: data.keyPrefix,
@@ -186,7 +192,6 @@ describe("API Key — Generation", () => {
     const { rawKey } = generateApiKey();
     const secret = rawKey.slice(API_KEY_PREFIX.length);
     expect(secret.length).toBeGreaterThanOrEqual(64);
-    // Must be valid hex
     expect(secret).toMatch(/^[0-9a-f]+$/);
   });
 
@@ -227,9 +232,7 @@ describe("API Key — Generation", () => {
   it("safe prefix does not reveal the complete key", () => {
     const { rawKey, keyPrefix } = generateApiKey();
     expect(keyPrefix.length).toBeLessThan(rawKey.length);
-    // Prefix must not contain the full secret
     expect(rawKey).not.toBe(keyPrefix);
-    // Prefix should end with "..."
     expect(keyPrefix).toMatch(/\.\.\.$/);
   });
 
@@ -269,10 +272,10 @@ describe("API Key — Plausibility", () => {
 });
 
 // ─────────────────────────────────────────────────────
-// 3. CREATION (service.ts — createBusinessApiKey)
+// 3. CREATION — BUSINESS
 // ─────────────────────────────────────────────────────
 
-describe("API Key — Creation", () => {
+describe("API Key — Business Creation", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
 
   beforeEach(() => {
@@ -289,6 +292,7 @@ describe("API Key — Creation", () => {
     const call = prisma.apiKey.create.mock.calls[0][0];
     expect(call.data.businessId).toBe("biz-1");
     expect(call.data.name).toBe("Production");
+    expect(call.data.userId).toBeNull();
   });
 
   it("database receives keyHash, never rawKey", async () => {
@@ -300,9 +304,8 @@ describe("API Key — Creation", () => {
     const call = prisma.apiKey.create.mock.calls[0][0];
     const persistedHash = call.data.keyHash as string;
     expect(typeof persistedHash).toBe("string");
-    expect(persistedHash.length).toBe(64); // SHA-256 hex
+    expect(persistedHash.length).toBe(64);
     expect(persistedHash).not.toBe(result.rawKey);
-    // rawKey must not appear in the persisted data
     expect(call.data).not.toHaveProperty("rawKey");
   });
 
@@ -323,6 +326,17 @@ describe("API Key — Creation", () => {
     });
 
     expect(result.keyPrefix).toMatch(/^atr_.*\.\.\.$/);
+  });
+
+  it("ownership is business type", async () => {
+    const result = await createBusinessApiKey(prisma as unknown as any, {
+      businessId: "biz-1",
+      name: "Test",
+    });
+
+    expect(result.ownership.type).toBe("business");
+    expect(result.ownership.businessId).toBe("biz-1");
+    expect(result.ownership.userId).toBeNull();
   });
 
   it("rejects empty businessId", async () => {
@@ -376,7 +390,93 @@ describe("API Key — Creation", () => {
 });
 
 // ─────────────────────────────────────────────────────
-// 4. VALIDATION (service.ts — validateApiKey)
+// 4. CREATION — PERSONAL
+// ─────────────────────────────────────────────────────
+
+describe("API Key — Personal Creation", () => {
+  let prisma: ReturnType<typeof createMockPrisma>;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+  });
+
+  it("persists a key with correct userId and name", async () => {
+    await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "My App",
+    });
+
+    expect(prisma.apiKey.create).toHaveBeenCalledOnce();
+    const call = prisma.apiKey.create.mock.calls[0][0];
+    expect(call.data.userId).toBe("user-1");
+    expect(call.data.businessId).toBeNull();
+    expect(call.data.name).toBe("My App");
+  });
+
+  it("ownership is personal type", async () => {
+    const result = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    expect(result.ownership.type).toBe("personal");
+    expect(result.ownership.userId).toBe("user-1");
+    expect(result.ownership.businessId).toBeNull();
+  });
+
+  it("raw key returned exactly once", async () => {
+    const result = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    expect(result.rawKey).toMatch(/^atr_/);
+    expect(result.rawKey.length).toBe(68);
+  });
+
+  it("database receives keyHash, never rawKey", async () => {
+    const result = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    const call = prisma.apiKey.create.mock.calls[0][0];
+    expect(call.data.keyHash).not.toBe(result.rawKey);
+    expect(call.data).not.toHaveProperty("rawKey");
+  });
+
+  it("rejects empty userId", async () => {
+    await expect(
+      createPersonalApiKey(prisma as unknown as any, {
+        userId: "",
+        name: "Test",
+      })
+    ).rejects.toThrow("userId is required");
+  });
+
+  it("rejects blank name", async () => {
+    await expect(
+      createPersonalApiKey(prisma as unknown as any, {
+        userId: "user-1",
+        name: "   ",
+      })
+    ).rejects.toThrow("name is required");
+  });
+
+  it("accepts optional expiry", async () => {
+    const future = new Date(Date.now() + 86400000 * 30);
+    const result = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+      expiresAt: future,
+    });
+
+    expect(result.expiresAt).toEqual(future);
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// 5. VALIDATION (unified — supports both types)
 // ─────────────────────────────────────────────────────
 
 describe("API Key — Validation", () => {
@@ -386,7 +486,7 @@ describe("API Key — Validation", () => {
     prisma = createMockPrisma();
   });
 
-  it("valid key succeeds with correct apiKeyId and businessId", async () => {
+  it("valid business key returns type=business", async () => {
     const created = await createBusinessApiKey(prisma as unknown as any, {
       businessId: "biz-1",
       name: "Production",
@@ -399,10 +499,32 @@ describe("API Key — Validation", () => {
 
     expect(result.valid).toBe(true);
     if (result.valid) {
+      expect(result.key.type).toBe("business");
       expect(result.key.apiKeyId).toBeTruthy();
       expect(result.key.businessId).toBe("biz-1");
+      expect(result.key.userId).toBeNull();
       expect(result.key.name).toBe("Production");
-      expect(result.key.keyPrefix).toMatch(/^atr_/);
+    }
+  });
+
+  it("valid personal key returns type=personal", async () => {
+    const created = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "My App",
+    });
+
+    const result = await validateApiKey(
+      prisma as unknown as any,
+      created.rawKey
+    );
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.key.type).toBe("personal");
+      expect(result.key.apiKeyId).toBeTruthy();
+      expect(result.key.userId).toBe("user-1");
+      expect(result.key.businessId).toBeNull();
+      expect(result.key.name).toBe("My App");
     }
   });
 
@@ -439,13 +561,12 @@ describe("API Key — Validation", () => {
     }
   });
 
-  it("rejects revoked key", async () => {
+  it("rejects revoked business key", async () => {
     const created = await createBusinessApiKey(prisma as unknown as any, {
       businessId: "biz-1",
       name: "Test",
     });
 
-    // Revoke the key
     await revokeBusinessApiKey(
       prisma as unknown as any,
       created.id,
@@ -463,17 +584,40 @@ describe("API Key — Validation", () => {
     }
   });
 
+  it("rejects revoked personal key", async () => {
+    const created = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    await revokePersonalApiKey(
+      prisma as unknown as any,
+      created.id,
+      "user-1"
+    );
+
+    const result = await validateApiKey(
+      prisma as unknown as any,
+      created.rawKey
+    );
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("REVOKED");
+    }
+  });
+
   it("rejects expired key", async () => {
-    // Create a key directly in the store with a past expiry
     const { rawKey, keyHash, keyPrefix } = generateApiKey();
     prisma._store.set("key-expired", {
       id: "key-expired",
+      userId: null,
       businessId: "biz-1",
       name: "Expired",
       keyHash,
       keyPrefix,
       lastUsedAt: null,
-      expiresAt: new Date(Date.now() - 86400000), // yesterday
+      expiresAt: new Date(Date.now() - 86400000),
       revokedAt: null,
       createdAt: new Date(),
     });
@@ -489,6 +633,58 @@ describe("API Key — Validation", () => {
     }
   });
 
+  it("rejects invalid ownership state (both null)", async () => {
+    const { rawKey, keyHash, keyPrefix } = generateApiKey();
+    prisma._store.set("key-invalid", {
+      id: "key-invalid",
+      userId: null,
+      businessId: null,
+      name: "Invalid",
+      keyHash,
+      keyPrefix,
+      lastUsedAt: null,
+      expiresAt: null,
+      revokedAt: null,
+      createdAt: new Date(),
+    });
+
+    const result = await validateApiKey(
+      prisma as unknown as any,
+      rawKey
+    );
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("INVALID_OWNERSHIP");
+    }
+  });
+
+  it("rejects invalid ownership state (both set)", async () => {
+    const { rawKey, keyHash, keyPrefix } = generateApiKey();
+    prisma._store.set("key-both", {
+      id: "key-both",
+      userId: "user-1",
+      businessId: "biz-1",
+      name: "Both",
+      keyHash,
+      keyPrefix,
+      lastUsedAt: null,
+      expiresAt: null,
+      revokedAt: null,
+      createdAt: new Date(),
+    });
+
+    const result = await validateApiKey(
+      prisma as unknown as any,
+      rawKey
+    );
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("INVALID_OWNERSHIP");
+    }
+  });
+
   it("updates lastUsedAt after successful validation", async () => {
     const created = await createBusinessApiKey(prisma as unknown as any, {
       businessId: "biz-1",
@@ -497,7 +693,6 @@ describe("API Key — Validation", () => {
 
     await validateApiKey(prisma as unknown as any, created.rawKey);
 
-    // The update call should have been made
     expect(prisma.apiKey.update).toHaveBeenCalled();
     const updateCall = prisma.apiKey.update.mock.calls[0][0];
     expect(updateCall.data.lastUsedAt).toBeInstanceOf(Date);
@@ -528,10 +723,10 @@ describe("API Key — Validation", () => {
 });
 
 // ─────────────────────────────────────────────────────
-// 5. REVOCATION (service.ts — revokeBusinessApiKey)
+// 6. REVOCATION — BUSINESS
 // ─────────────────────────────────────────────────────
 
-describe("API Key — Revocation", () => {
+describe("API Key — Business Revocation", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
 
   beforeEach(() => {
@@ -586,7 +781,6 @@ describe("API Key — Revocation", () => {
       "biz-1"
     );
 
-    // Both calls succeed (updateMany always sets revokedAt)
     expect(first).toBe(true);
     expect(second).toBe(true);
   });
@@ -612,10 +806,61 @@ describe("API Key — Revocation", () => {
 });
 
 // ─────────────────────────────────────────────────────
-// 6. LISTING (service.ts — listBusinessApiKeys)
+// 7. REVOCATION — PERSONAL
 // ─────────────────────────────────────────────────────
 
-describe("API Key — Listing", () => {
+describe("API Key — Personal Revocation", () => {
+  let prisma: ReturnType<typeof createMockPrisma>;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+  });
+
+  it("revokes a key belonging to the correct user", async () => {
+    const created = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    const revoked = await revokePersonalApiKey(
+      prisma as unknown as any,
+      created.id,
+      "user-1"
+    );
+
+    expect(revoked).toBe(true);
+  });
+
+  it("another user cannot revoke the key", async () => {
+    const created = await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    const revoked = await revokePersonalApiKey(
+      prisma as unknown as any,
+      created.id,
+      "user-OTHER"
+    );
+
+    expect(revoked).toBe(false);
+  });
+
+  it("returns false for empty arguments", async () => {
+    expect(
+      await revokePersonalApiKey(prisma as unknown as any, "", "user-1")
+    ).toBe(false);
+    expect(
+      await revokePersonalApiKey(prisma as unknown as any, "key-1", "")
+    ).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// 8. LISTING — BUSINESS
+// ─────────────────────────────────────────────────────
+
+describe("API Key — Business Listing", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
 
   beforeEach(() => {
@@ -643,6 +888,20 @@ describe("API Key — Listing", () => {
 
     expect(keys).toHaveLength(2);
     expect(keys.every((k) => k.businessId === "biz-1")).toBe(true);
+  });
+
+  it("does not return personal keys", async () => {
+    await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Personal Key",
+    });
+
+    const keys = await listBusinessApiKeys(
+      prisma as unknown as any,
+      "biz-1"
+    );
+
+    expect(keys).toHaveLength(0);
   });
 
   it("raw key is never returned", async () => {
@@ -691,6 +950,7 @@ describe("API Key — Listing", () => {
     expect(keys).toHaveLength(1);
     const key = keys[0];
     expect(key).toHaveProperty("id");
+    expect(key).toHaveProperty("userId");
     expect(key).toHaveProperty("businessId");
     expect(key).toHaveProperty("name");
     expect(key).toHaveProperty("keyPrefix");
@@ -717,7 +977,81 @@ describe("API Key — Listing", () => {
 });
 
 // ─────────────────────────────────────────────────────
-// 7. SECURITY GUARANTEES
+// 9. LISTING — PERSONAL
+// ─────────────────────────────────────────────────────
+
+describe("API Key — Personal Listing", () => {
+  let prisma: ReturnType<typeof createMockPrisma>;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+  });
+
+  it("returns keys scoped by userId", async () => {
+    await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Key A",
+    });
+    await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Key B",
+    });
+    await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-2",
+      name: "Other User Key",
+    });
+
+    const keys = await listPersonalApiKeys(
+      prisma as unknown as any,
+      "user-1"
+    );
+
+    expect(keys).toHaveLength(2);
+    expect(keys.every((k) => k.userId === "user-1")).toBe(true);
+  });
+
+  it("does not return business keys", async () => {
+    await createBusinessApiKey(prisma as unknown as any, {
+      businessId: "biz-1",
+      name: "Business Key",
+    });
+
+    const keys = await listPersonalApiKeys(
+      prisma as unknown as any,
+      "user-1"
+    );
+
+    expect(keys).toHaveLength(0);
+  });
+
+  it("keyHash is never returned", async () => {
+    await createPersonalApiKey(prisma as unknown as any, {
+      userId: "user-1",
+      name: "Test",
+    });
+
+    const keys = await listPersonalApiKeys(
+      prisma as unknown as any,
+      "user-1"
+    );
+
+    for (const key of keys) {
+      expect(key).not.toHaveProperty("keyHash");
+    }
+  });
+
+  it("returns empty array for empty userId", async () => {
+    const keys = await listPersonalApiKeys(
+      prisma as unknown as any,
+      ""
+    );
+
+    expect(keys).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// 10. SECURITY GUARANTEES
 // ─────────────────────────────────────────────────────
 
 describe("API Key — Security Guarantees", () => {
@@ -730,9 +1064,7 @@ describe("API Key — Security Guarantees", () => {
 
   it("key prefix reveals at most 6 random characters", () => {
     const { rawKey, keyPrefix } = generateApiKey();
-    // prefix = "atr_" + 6 chars + "..." = 13 chars total
     expect(keyPrefix.length).toBe(API_KEY_PREFIX.length + 6 + 3);
-    // The prefix must be much shorter than the full key
     expect(keyPrefix.length).toBeLessThan(rawKey.length / 2);
   });
 

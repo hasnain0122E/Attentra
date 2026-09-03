@@ -31,6 +31,32 @@ const items = [
   },
 ];
 
+function resolveHeading(
+  successRate: number,
+  fallbackRate: number,
+): string {
+  if (successRate === 0 && fallbackRate === 0) {
+    return "No routing data yet.";
+  }
+
+  // High success + high fallback → fallback is recovering requests
+  if (successRate >= 80 && fallbackRate >= 30) {
+    return "Fallbacks are recovering requests.";
+  }
+
+  // Good success, low fallback
+  if (successRate >= 80) {
+    return "Routing is healthy.";
+  }
+
+  // Meaningful failures
+  if (successRate > 0) {
+    return "Execution reliability needs attention.";
+  }
+
+  return "No successful executions yet.";
+}
+
 export default function RoutingHealth({
   successRate,
   fallbackRate,
@@ -38,11 +64,8 @@ export default function RoutingHealth({
 }: RoutingHealthProps) {
   const values = { successRate, fallbackRate, avgDecisionTimeMs };
 
-  const heading = successRate >= 90
-    ? "Attentra is routing normally."
-    : successRate > 0
-      ? "Attentra routing is degraded."
-      : "No routing data yet.";
+  const heading = resolveHeading(successRate, fallbackRate);
+
   return (
     <section className="relative overflow-hidden rounded-2xl bg-[var(--color-foreground)] p-5 text-white lg:p-6">
       <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full border border-white/[0.06]" />

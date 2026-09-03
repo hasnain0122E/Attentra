@@ -2,10 +2,28 @@
  * Attentra — API Key Domain Types
  *
  * Phase 12.2 — Business API Key Backend Foundation
+ * Phase 12.13.1 — Personal API Key Ownership
  *
  * Provider-independent types for the API key lifecycle.
  * These types decouple the API key module from Prisma internals.
+ *
+ * ApiKey supports dual ownership (XOR invariant):
+ *   Personal: userId set, businessId null
+ *   Business: businessId set, userId null
  */
+
+// ─────────────────────────────────────────────────────
+// OWNERSHIP
+// ─────────────────────────────────────────────────────
+
+/** Discriminated ownership for an API key. */
+export type ApiKeyOwnership =
+  | { type: "personal"; userId: string; businessId: null }
+  | { type: "business"; userId: null; businessId: string };
+
+// ─────────────────────────────────────────────────────
+// CREATION
+// ─────────────────────────────────────────────────────
 
 /**
  * Result returned exactly once when a new API key is created.
@@ -17,8 +35,8 @@ export interface CreatedApiKey {
   /** ApiKey row identifier */
   id: string;
 
-  /** Business that owns this key */
-  businessId: string;
+  /** Owner type — personal or business */
+  ownership: ApiKeyOwnership;
 
   /** Human-readable label */
   name: string;
@@ -41,25 +59,38 @@ export interface CreatedApiKey {
   createdAt: Date;
 }
 
+// ─────────────────────────────────────────────────────
+// VALIDATION
+// ─────────────────────────────────────────────────────
+
 /**
- * Result of a successful API key validation.
- *
- * Contains enough information for downstream middleware
- * to resolve request ownership without exposing secrets.
+ * Successful validation of a business API key.
  */
-export interface ValidatedApiKey {
-  /** ApiKey row identifier */
+export interface ValidatedBusinessKey {
+  type: "business";
   apiKeyId: string;
-
-  /** Business that owns this key */
   businessId: string;
-
-  /** Human-readable label */
+  userId: null;
   name: string;
-
-  /** Short display prefix for logging / dashboards */
   keyPrefix: string;
 }
+
+/**
+ * Successful validation of a personal API key.
+ */
+export interface ValidatedPersonalKey {
+  type: "personal";
+  apiKeyId: string;
+  userId: string;
+  businessId: null;
+  name: string;
+  keyPrefix: string;
+}
+
+/**
+ * Discriminated union of successfully validated API keys.
+ */
+export type ValidatedApiKey = ValidatedBusinessKey | ValidatedPersonalKey;
 
 /**
  * Discriminated result of API key validation.
@@ -79,7 +110,12 @@ export type ValidationFailureReason =
   | "MALFORMED"
   | "NOT_FOUND"
   | "REVOKED"
-  | "EXPIRED";
+  | "EXPIRED"
+  | "INVALID_OWNERSHIP";
+
+// ─────────────────────────────────────────────────────
+// METADATA (listing / dashboard)
+// ─────────────────────────────────────────────────────
 
 /**
  * Safe metadata for a single API key (listing / dashboard).
@@ -88,7 +124,8 @@ export type ValidationFailureReason =
  */
 export interface ApiKeyMetadata {
   id: string;
-  businessId: string;
+  userId: string | null;
+  businessId: string | null;
   name: string;
   keyPrefix: string;
   lastUsedAt: Date | null;

@@ -16,8 +16,12 @@ interface ExecutionSummaryProps {
 }
 
 function formatLatency(value: number) {
+  if (!value || value <= 0) {
+    return "\u2014";
+  }
+
   if (value < 1000) {
-    return `${value} ms`;
+    return `${Math.round(value)} ms`;
   }
 
   return `${(value / 1000).toFixed(2)} s`;

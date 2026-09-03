@@ -2,10 +2,12 @@
  * Attentra — Unified Requester Resolver Tests
  *
  * Phase 12.3 — Focused tests for resolveRequester()
+ * Phase 12.13.1 — Personal API key support
  *
  * Coverage:
  *   - Session auth returns session requester
- *   - Bearer API key returns apiKey requester
+ *   - Business API key returns apiKey requester
+ *   - Personal API key returns personalApiKey requester
  *   - Session takes priority over API key
  *   - Invalid / revoked / expired API key → none
  *   - Missing auth → none
@@ -156,17 +158,19 @@ describe("resolveRequester — Session Auth", () => {
 });
 
 // ─────────────────────────────────────────────────────
-// API KEY AUTH
+// BUSINESS API KEY AUTH
 // ─────────────────────────────────────────────────────
 
-describe("resolveRequester — API Key Auth", () => {
-  it("returns apiKey requester for valid Bearer key", async () => {
+describe("resolveRequester — Business API Key Auth", () => {
+  it("returns apiKey requester for valid business Bearer key", async () => {
     mockAuth.mockResolvedValue(null);
     mockValidateApiKey.mockResolvedValue({
       valid: true,
       key: {
+        type: "business",
         apiKeyId: "key-1",
         businessId: "biz-1",
+        userId: null,
         name: "Production",
         keyPrefix: "atr_ab12cd...",
       },
@@ -185,7 +189,47 @@ describe("resolveRequester — API Key Auth", () => {
       apiKeyId: "key-1",
     });
   });
+});
 
+// ─────────────────────────────────────────────────────
+// PERSONAL API KEY AUTH
+// ─────────────────────────────────────────────────────
+
+describe("resolveRequester — Personal API Key Auth", () => {
+  it("returns personalApiKey requester for valid personal Bearer key", async () => {
+    mockAuth.mockResolvedValue(null);
+    mockValidateApiKey.mockResolvedValue({
+      valid: true,
+      key: {
+        type: "personal",
+        apiKeyId: "key-p1",
+        userId: "user-1",
+        businessId: null,
+        name: "My App",
+        keyPrefix: "atr_xy78zw...",
+      },
+    });
+
+    const headers = new Headers({
+      authorization: "Bearer atr_personalkey123456789",
+    });
+
+    const result = await resolveRequester(headers);
+
+    expect(result).toEqual({
+      authType: "personalApiKey",
+      userId: "user-1",
+      businessId: null,
+      apiKeyId: "key-p1",
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// INVALID API KEY
+// ─────────────────────────────────────────────────────
+
+describe("resolveRequester — Invalid API Key", () => {
   it("returns none for invalid API key", async () => {
     mockAuth.mockResolvedValue(null);
     mockValidateApiKey.mockResolvedValue({

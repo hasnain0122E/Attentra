@@ -2,19 +2,21 @@
  * Attentra — Unified Requester Resolver
  *
  * Phase 12.3 — Unified Authentication + Request Ownership
+ * Phase 12.13.1 — Personal API Key Support
  *
  * Resolves the identity of an incoming request through two
  * authentication strategies, tried in order:
  *
  *   1. Auth.js session  (dashboard users with browser cookies)
- *   2. Bearer API key   (developer / workspace clients)
+ *   2. Bearer API key   (developer / workspace / personal clients)
  *
  * Returns a discriminated union that downstream route handlers
  * can use to set correct Request ownership:
  *
- *   Session → { authType: "session", userId, businessId: null, apiKeyId: null }
- *   ApiKey  → { authType: "apiKey",  userId: null, businessId, apiKeyId }
- *   None    → { authType: "none" }
+ *   Session          → { authType: "session", userId, businessId: null, apiKeyId: null }
+ *   Business ApiKey  → { authType: "apiKey",  userId: null, businessId, apiKeyId }
+ *   Personal ApiKey  → { authType: "personalApiKey", userId, businessId: null, apiKeyId }
+ *   None             → { authType: "none" }
  *
  * This module does NOT perform authorization. It only resolves identity.
  * Authorization (role checks, business membership) belongs to the
@@ -47,6 +49,14 @@ export interface ApiKeyRequester {
   apiKeyId: string;
 }
 
+/** Authenticated via Personal API key. */
+export interface PersonalApiKeyRequester {
+  authType: "personalApiKey";
+  userId: string;
+  businessId: null;
+  apiKeyId: string;
+}
+
 /** No valid authentication. */
 export interface UnauthenticatedRequester {
   authType: "none";
@@ -55,6 +65,7 @@ export interface UnauthenticatedRequester {
 export type Requester =
   | SessionRequester
   | ApiKeyRequester
+  | PersonalApiKeyRequester
   | UnauthenticatedRequester;
 
 // ─────────────────────────────────────────────────────
@@ -114,11 +125,23 @@ export async function resolveRequester(
     const result = await validateApiKey(db, token);
 
     if (result.valid) {
+      const key = result.key;
+
+      if (key.type === "personal") {
+        return {
+          authType: "personalApiKey",
+          userId: key.userId,
+          businessId: null,
+          apiKeyId: key.apiKeyId,
+        };
+      }
+
+      // Business key
       return {
         authType: "apiKey",
         userId: null,
-        businessId: result.key.businessId,
-        apiKeyId: result.key.apiKeyId,
+        businessId: key.businessId,
+        apiKeyId: key.apiKeyId,
       };
     }
 

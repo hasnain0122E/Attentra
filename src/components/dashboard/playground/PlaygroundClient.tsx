@@ -67,6 +67,17 @@ interface ChatCompletionsResponse {
     };
     latencyMs: number;
     actualCost: number;
+    executionAttempts?: {
+      attempt: number;
+      modelId: string;
+      modelIdentifier: string;
+      provider: string;
+      success: boolean;
+      latencyMs: number;
+      retryable?: boolean;
+      errorCode?: string;
+      errorMessage?: string;
+    }[];
   };
   timestamp: string;
   error?: {
@@ -79,9 +90,8 @@ interface ChatCompletionsResponse {
 /**
  * Map the real API response into PlaygroundResultData.
  *
- * The API does not include per-attempt details or routing candidates,
- * so we synthesise display-safe attempt entries from the available
- * routing + execution metadata.
+ * Uses real per-attempt data from the orchestrator when available,
+ * falling back to synthesised entries only if the API omits them.
  */
 function mapApiResponse(data: ChatCompletionsResponse): PlaygroundResultData {
   const {
@@ -89,46 +99,35 @@ function mapApiResponse(data: ChatCompletionsResponse): PlaygroundResultData {
     execution: e,
   } = data;
 
-  // ── Synthesise execution attempts ──────────────────
+  // ── Map execution attempts ─────────────────────────
   //
-  // The API returns attempts as a count. The playground timeline
-  // needs per-attempt display data. We reconstruct a plausible
-  // attempt list from routing (primary) and execution (actual).
-  const attempts: ExecutionAttemptDisplayData[] = [];
+  // The API returns real per-attempt data from the orchestrator
+  // including actual latency, error codes, and success status.
+  const attempts: ExecutionAttemptDisplayData[] = (e.executionAttempts ?? []).map(
+    (a) => ({
+      attempt: a.attempt,
+      modelId: a.modelId,
+      modelIdentifier: a.modelIdentifier,
+      displayName: a.modelIdentifier,
+      provider: a.provider,
+      success: a.success,
+      latencyMs: a.latencyMs,
+      retryable: a.retryable,
+      errorCode: a.errorCode,
+      errorMessage: a.errorMessage,
+    }),
+  );
 
-  if (e.fallbackUsed) {
-    // Primary model failed → fallback model succeeded
-    attempts.push({
-      attempt: 1,
-      modelId: r.selectedModelId,
-      modelIdentifier: r.selectedModelIdentifier,
-      displayName: r.selectedModelDisplayName,
-      provider: r.selectedProvider,
-      success: false,
-      latencyMs: 0,
-      retryable: true,
-      errorCode: "EXECUTION_FAILED",
-      errorMessage: "Primary model execution failed.",
-    });
-
-    attempts.push({
-      attempt: 2,
-      modelId: e.modelId,
-      modelIdentifier: e.modelIdentifier,
-      displayName: e.modelIdentifier,
-      provider: e.provider,
-      success: true,
-      latencyMs: e.latencyMs,
-    });
-  } else {
-    // Primary model succeeded directly
+  // Fallback: if the API did not include attempt details (older response),
+  // synthesise a minimal single-attempt entry from execution metadata.
+  if (attempts.length === 0) {
     attempts.push({
       attempt: 1,
       modelId: e.modelId,
       modelIdentifier: e.modelIdentifier,
       displayName: e.modelIdentifier,
       provider: e.provider,
-      success: true,
+      success: !e.fallbackUsed,
       latencyMs: e.latencyMs,
     });
   }

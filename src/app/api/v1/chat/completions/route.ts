@@ -158,6 +158,18 @@ function buildSuccessResponse(
       usage: result.usage,
       latencyMs: result.latencyMs,
       actualCost: result.actualCost,
+
+      executionAttempts: result.executionAttempts.map((a) => ({
+        attempt: a.attemptNumber,
+        modelId: a.modelId,
+        modelIdentifier: a.modelIdentifier,
+        provider: a.providerId,
+        success: a.success,
+        latencyMs: a.latencyMs,
+        retryable: a.error?.retryable,
+        errorCode: a.error?.code,
+        errorMessage: a.error?.message,
+      })),
     },
 
     timestamp: result.timestamp,
@@ -336,12 +348,19 @@ export async function POST(request: NextRequest) {
     // ── 7. Attach request ownership ─────────────────
     //
     // Session requests: owned by the authenticated user.
-    // API-key requests: owned by the business workspace.
+    // Business API-key requests: owned by the business workspace.
+    // Personal API-key requests: owned by the individual user.
     //
     // routeAndPersist() owns routing persistence and intentionally
     // does not depend on authentication. The API attaches trusted
     // ownership after routing succeeds.
-    if (routingResult.persisted?.decisionId) {
+    //
+    // Gate on persisted.success (not decisionId) because the
+    // ownership update uses effectiveRequestId — it does not need
+    // the RoutingDecision ID. Checking decisionId could silently
+    // skip ownership when the post-transaction findUnique returns
+    // null despite a successful upsert.
+    if (routingResult.persisted?.success) {
       const ownershipData: Record<string, string | null> = {};
 
       if (requester.authType === "session") {
@@ -350,6 +369,10 @@ export async function POST(request: NextRequest) {
         ownershipData.businessId = requester.businessId;
         ownershipData.apiKeyId = requester.apiKeyId;
         ownershipData.userId = null;
+      } else if (requester.authType === "personalApiKey") {
+        ownershipData.userId = requester.userId;
+        ownershipData.businessId = null;
+        ownershipData.apiKeyId = requester.apiKeyId;
       }
 
       await prisma.request.update({

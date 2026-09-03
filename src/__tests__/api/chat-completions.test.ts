@@ -650,6 +650,98 @@ describe("Chat Completions API — Consumer Ownership", () => {
     const call = mockRequestUpdate.mock.calls[0][0];
     expect(call.data.userId).toBeNull();
   });
+
+  it("attaches userId and apiKeyId for personal API-key requests", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "personalApiKey",
+      userId: "user-42",
+      businessId: null,
+      apiKeyId: "personal-key-7",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "err", retryable: false },
+      latencyMs: 100,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "personal-key-ownership",
+    });
+
+    await POST(req);
+
+    expect(mockRequestUpdate).toHaveBeenCalledWith({
+      where: { id: "personal-key-ownership" },
+      data: {
+        userId: "user-42",
+        businessId: null,
+        apiKeyId: "personal-key-7",
+      },
+    });
+  });
+
+  it("attaches ownership even when decisionId is undefined but success is true", async () => {
+    mockRouteAndPersist.mockResolvedValue({
+      success: true,
+      decision: {
+        taskType: "GENERAL",
+        complexity: "LOW",
+        tokenEstimate: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        candidates: [],
+        selected: {},
+        fallbacks: [],
+        rejected: [],
+        reason: "test",
+        timestamp: new Date(),
+      },
+      persisted: {
+        success: true,
+        // decisionId intentionally omitted — simulates post-transaction
+        // findUnique returning null despite successful upsert
+      },
+    });
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "err", retryable: false },
+      latencyMs: 100,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "no-decision-id-test",
+    });
+
+    await POST(req);
+
+    // Ownership MUST still be attached because persisted.success is true
+    expect(mockRequestUpdate).toHaveBeenCalledWith({
+      where: { id: "no-decision-id-test" },
+      data: {
+        userId: "test-user-id",
+      },
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────

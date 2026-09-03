@@ -28,6 +28,7 @@ model User {
   sessions    Session[]
   memberships Membership[]
   requests    Request[]
+  apiKeys     ApiKey[]
 }
 
 model Account {
@@ -102,7 +103,8 @@ model Membership {
 
 model ApiKey {
   id         String    @id @default(cuid())
-  businessId String
+  userId     String?
+  businessId String?
   name       String
   keyHash    String    @unique
   keyPrefix  String
@@ -111,7 +113,8 @@ model ApiKey {
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
 
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
   requests Request[]
 }
 
