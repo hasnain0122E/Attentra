@@ -24,10 +24,11 @@ const items = [
     format: (v: number) => `${v.toFixed(1)}%`,
   },
   {
-    label: "Avg. decision time",
+    // end-to-end Request.latencyMs, not a separately measured routing latency
+    label: "Avg. request latency",
     key: "avgDecisionTimeMs" as const,
     icon: Lightning,
-    format: (v: number) => v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(2)}s`,
+    format: (v: number) => v <= 0 ? "—" : v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(2)}s`,
   },
 ];
 

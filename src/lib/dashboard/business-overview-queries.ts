@@ -211,7 +211,8 @@ export async function fetchBusinessOverviewData(
     (r) => r.status === "FAILED",
   ).length;
 
-  // ── Routing decision time ───────────────────────
+  // ── Average end-to-end request latency ──────────
+  // Routing latency is not separately measured; use Request.latencyMs.
   const requestsWithLatency = requestsWithRouting.filter(
     (r) => r.latencyMs !== null && r.latencyMs > 0,
   );

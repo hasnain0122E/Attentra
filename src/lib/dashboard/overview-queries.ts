@@ -176,9 +176,9 @@ export async function fetchOverviewData(
     ? (successCount / totalRequests) * 100
     : 0;
 
-  // Average routing decision time:
-  // RoutingDecision doesn't have its own latency field.
-  // We approximate using requests that have latency data.
+  // Average end-to-end request latency:
+  // RoutingDecision doesn't have its own latency field (routing latency is
+  // not separately measured). We use Request.latencyMs (end-to-end).
   const requestsWithLatency = requestsWithRouting.filter(
     (r) => r.latencyMs !== null && r.latencyMs > 0,
   );

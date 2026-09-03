@@ -56,10 +56,17 @@ function getCurrentMonthTo(): string {
 function formatPeriodLabel(from: string | null, to: string | null): string {
   if (!from || !to) return "All time";
 
-  const fromDate = new Date(from);
+  // from/to are YYYY-MM-DD strings. Deriving the label from the string parts
+  // (not Date parsing) keeps the heading stable in every browser timezone —
+  // new Date("YYYY-MM-DD") is UTC midnight and shifts a day back locally.
+  const [year, month] = from.split("-").map(Number);
 
-  const monthName = fromDate.toLocaleString("en-US", { month: "long" });
-  const year = fromDate.getFullYear();
+  if (!year || !month || month < 1 || month > 12) return "All time";
+
+  const monthName = new Date(Date.UTC(year, month - 1, 1)).toLocaleString(
+    "en-US",
+    { month: "long", timeZone: "UTC" },
+  );
 
   return `${monthName} ${year}`;
 }

@@ -33,6 +33,14 @@ function formatLatency(value: number) {
   return `${(value / 1000).toFixed(2)}s`;
 }
 
+function formatRoutingDetail(ms: number | null | undefined) {
+  if (!ms || ms <= 0) {
+    return "Routing latency not measured";
+  }
+
+  return `${Math.round(ms)}ms routing`;
+}
+
 export default function RequestMetadataGrid({
   request,
 }: RequestMetadataGridProps) {
@@ -48,7 +56,9 @@ export default function RequestMetadataGrid({
           value={formatLatency(
             request.latencyMs,
           )}
-          detail={`${request.routingLatencyMs}ms routing`}
+          detail={formatRoutingDetail(
+            request.routingLatencyMs,
+          )}
           icon={Clock}
         />
 

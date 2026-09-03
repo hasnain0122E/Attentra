@@ -88,6 +88,51 @@ interface ChatCompletionsResponse {
 }
 
 /**
+ * Concise user-facing attempt message.
+ *
+ * The API's per-attempt error message is a sanitized-but-verbose provider
+ * diagnostic; History detail renders concise wording for the same failures,
+ * so the playground reuses those semantics here. Failure code, retryability,
+ * fallback visibility, and provider/model identity are all preserved by the
+ * surrounding timeline UI.
+ */
+function userFacingAttemptMessage(
+  attempt: { attempt: number; success: boolean; errorCode?: string },
+  fallbackUsed: boolean,
+): string {
+  if (!attempt.success && fallbackUsed && attempt.attempt === 1) {
+    // Same wording History detail synthesizes for a failed primary model.
+    return "Primary model execution failed.";
+  }
+
+  switch (attempt.errorCode) {
+    case "AUTHENTICATION":
+      return "Provider rejected the configured credentials.";
+    case "RATE_LIMIT":
+      return "Provider rate limit exceeded.";
+    case "TIMEOUT":
+    case "REQUEST_TIMEOUT":
+      return "Provider request timed out.";
+    case "INVALID_REQUEST":
+      return "Provider rejected the request as invalid.";
+    case "MODEL_UNAVAILABLE":
+      return "Model unavailable at the provider.";
+    case "CONTEXT_LENGTH":
+      return "Input exceeded the model's context window.";
+    case "SERVER_ERROR":
+      return "Provider server error.";
+    case "NETWORK_ERROR":
+      return "Network error reaching the provider.";
+    case "MISSING_API_KEY":
+      return "Provider API key not configured.";
+    case "INVALID_RESPONSE":
+      return "Provider returned a malformed response.";
+    default:
+      return "The provider did not return a successful completion.";
+  }
+}
+
+/**
  * Map the real API response into PlaygroundResultData.
  *
  * Uses real per-attempt data from the orchestrator when available,
@@ -114,7 +159,9 @@ function mapApiResponse(data: ChatCompletionsResponse): PlaygroundResultData {
       latencyMs: a.latencyMs,
       retryable: a.retryable,
       errorCode: a.errorCode,
-      errorMessage: a.errorMessage,
+      errorMessage: a.success
+        ? undefined
+        : userFacingAttemptMessage(a, e.fallbackUsed),
     }),
   );
 

@@ -1,5 +1,7 @@
 import type { PlaygroundResultData } from "@/types/dashboard";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface RequestMetadataProps {
   result: PlaygroundResultData;
 }
@@ -9,7 +11,8 @@ function formatCost(value: number | undefined) {
     return "—";
   }
 
-  return `$${value.toFixed(6)}`;
+  // Canonical USD in, display-currency presentation out (product convention).
+  return formatDisplayCurrency(value);
 }
 
 export default function RequestMetadata({

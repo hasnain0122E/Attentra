@@ -55,9 +55,16 @@ export default function BusinessRoutingHealth({
       icon: WarningCircle,
     },
     {
-      label: "Routing decision",
-      value: `${health.avgDecisionTimeMs}ms`,
-      detail: "average routing latency",
+      // end-to-end Request.latencyMs, not a separately measured routing latency
+      label: "Avg. request latency",
+      value:
+        health.avgDecisionTimeMs > 0
+          ? `${health.avgDecisionTimeMs}ms`
+          : "—",
+      detail:
+        health.avgDecisionTimeMs > 0
+          ? "average end-to-end request latency"
+          : "not measured yet",
       icon: Clock,
     },
   ];
