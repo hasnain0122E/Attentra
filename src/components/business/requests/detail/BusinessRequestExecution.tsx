@@ -5,10 +5,10 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 
-import type { BusinessRequestItem } from "@/lib/business/request-data";
+import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
 
 interface BusinessRequestExecutionProps {
-  request: BusinessRequestItem;
+  request: BusinessRequestHistoryItem;
 }
 
 function formatLatency(value: number) {

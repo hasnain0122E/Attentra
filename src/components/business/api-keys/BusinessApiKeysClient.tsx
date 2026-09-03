@@ -10,6 +10,7 @@ import BusinessApiKeyFilters from "./BusinessApiKeyFilters";
 import BusinessApiKeyMetric from "./BusinessApiKeyMetric";
 import BusinessApiKeyTable from "./BusinessApiKeyTable";
 import CreateBusinessApiKeyModal from "./CreateBusinessApiKeyModal";
+import CreatedBusinessKeyModal from "./CreatedBusinessKeyModal";
 import RevokeBusinessApiKeyModal from "./RevokeBusinessApiKeyModal";
 
 /** Single API key as returned by the listing API. */
@@ -23,6 +24,13 @@ export interface BusinessApiKeyData {
   createdAt: string;
 }
 
+// ── Modal state machine ────────────────────────────
+type ModalState =
+  | { type: "closed" }
+  | { type: "create" }
+  | { type: "created"; rawKey: string; keyName: string }
+  | { type: "revoke"; apiKeyId: string; keyName: string };
+
 export default function BusinessApiKeysClient() {
   const { business } = useBusiness();
 
@@ -33,8 +41,7 @@ export default function BusinessApiKeysClient() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
 
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [revokeTarget, setRevokeTarget] = useState<BusinessApiKeyData | null>(null);
+  const [modalState, setModalState] = useState<ModalState>({ type: "closed" });
 
   // ── Fetch API keys ────────────────────────────────
   const fetchKeys = useCallback(async () => {
@@ -124,28 +131,23 @@ export default function BusinessApiKeysClient() {
   }
 
   // ── Revoke handler ────────────────────────────────
-  async function confirmRevoke() {
-    if (!revokeTarget || !business) return;
+  const confirmRevoke = useCallback(async () => {
+    if (modalState.type !== "revoke" || !business) return;
 
     try {
       const res = await fetch(
-        `/api/business/${business.id}/api-keys/${revokeTarget.id}`,
+        `/api/business/${business.id}/api-keys/${modalState.apiKeyId}`,
         { method: "DELETE", headers: { Accept: "application/json" } },
       );
 
       if (!res.ok) throw new Error("Revoke failed");
 
-      setRevokeTarget(null);
+      setModalState({ type: "closed" });
       await fetchKeys();
     } catch (err) {
       console.error("[api-keys] Revoke failed", err);
     }
-  }
-
-  // ── Create handler (called by modal after success) ─
-  function handleCreated() {
-    void fetchKeys();
-  }
+  }, [modalState, business, fetchKeys]);
 
   // ── No business ───────────────────────────────────
   if (!business) {
@@ -233,7 +235,7 @@ export default function BusinessApiKeysClient() {
           {business.role === "OWNER" && (
             <button
               type="button"
-              onClick={() => setCreateModalOpen(true)}
+              onClick={() => setModalState({ type: "create" })}
               className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-xl bg-[var(--color-foreground)] px-4 text-[9px] font-semibold text-white transition hover:opacity-90"
             >
               <Plus size={12} weight="bold" />
@@ -322,21 +324,40 @@ export default function BusinessApiKeysClient() {
           </div>
         </div>
 
-        <BusinessApiKeyTable apiKeys={filteredKeys} onRevoke={setRevokeTarget} />
+        <BusinessApiKeyTable
+          apiKeys={filteredKeys}
+          onRevoke={(key) => {
+            if (key) setModalState({ type: "revoke", apiKeyId: key.id, keyName: key.name });
+          }}
+        />
       </div>
 
-      <CreateBusinessApiKeyModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        businessId={business.id}
-        onCreated={handleCreated}
-      />
+      {modalState.type === "create" && (
+        <CreateBusinessApiKeyModal
+          onClose={() => setModalState({ type: "closed" })}
+          onCreated={(rawKey, keyName) => {
+            setModalState({ type: "created", rawKey, keyName });
+            void fetchKeys();
+          }}
+          businessId={business.id}
+        />
+      )}
 
-      <RevokeBusinessApiKeyModal
-        apiKey={revokeTarget}
-        onClose={() => setRevokeTarget(null)}
-        onConfirm={confirmRevoke}
-      />
+      {modalState.type === "created" && (
+        <CreatedBusinessKeyModal
+          rawKey={modalState.rawKey}
+          keyName={modalState.keyName}
+          onClose={() => setModalState({ type: "closed" })}
+        />
+      )}
+
+      {modalState.type === "revoke" && (
+        <RevokeBusinessApiKeyModal
+          keyName={modalState.keyName}
+          onClose={() => setModalState({ type: "closed" })}
+          onConfirm={confirmRevoke}
+        />
+      )}
     </>
   );
 }

@@ -23,6 +23,22 @@ function formatCost(value?: number) {
   return formatDisplayCurrency(value);
 }
 
+/**
+ * Format a latency value for display.
+ * Returns em-dash for zero/null/undefined (no measurement available).
+ */
+function formatLatency(value: number | null | undefined): string {
+  if (!value || value <= 0) {
+    return "\u2014";
+  }
+
+  if (value < 1000) {
+    return `${Math.round(value)}ms`;
+  }
+
+  return `${(value / 1000).toFixed(2)}s`;
+}
+
 function buildConciseReason(request: RequestHistoryItem): string {
   const scoreText = request.routingScore > 0
     ? `routing score ${request.routingScore.toFixed(2)}`
@@ -113,7 +129,7 @@ export default function RequestRoutingOverview({
 
             <Metric
               label="Routing latency"
-              value={`${request.routingLatencyMs}ms`}
+              value={formatLatency(request.routingLatencyMs)}
             />
 
             <Metric

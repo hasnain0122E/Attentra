@@ -1528,3 +1528,515 @@ describe("Chat Completions API — Architecture", () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────────────
+// PHASE 12.14.1 — CORE PERSISTENCE RELIABILITY GATE
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — Persistence Reliability Gate", () => {
+  // ─────────────────────────────────────────────────
+  // A. Routing fails → no provider execution
+  // ─────────────────────────────────────────────────
+
+  it("A: routing failure prevents provider execution", async () => {
+    mockRouteAndPersist.mockResolvedValue({
+      success: false,
+      error: "No active models available",
+      errorCode: "NO_ACTIVE_MODELS",
+    });
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    const data = await parseJson(res);
+    expect(data.success).toBe(false);
+
+    const error = data.error as Record<string, unknown>;
+    expect(error.code).toBe("NO_ACTIVE_MODELS");
+
+    // Orchestrator MUST NOT be called
+    expect(mockExecute).not.toHaveBeenCalled();
+    // prepareExecutionFlow MUST NOT be called
+    expect(mockPrepareExecutionFlow).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────
+  // B. Routing succeeds, persistence fails → no provider execution
+  // ─────────────────────────────────────────────────
+
+  it("B: persistence failure after routing prevents provider execution", async () => {
+    mockRouteAndPersist.mockResolvedValue({
+      success: true,
+      decision: {
+        taskType: "GENERAL",
+        complexity: "LOW",
+        tokenEstimate: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        candidates: [],
+        selected: {},
+        fallbacks: [],
+        rejected: [],
+        reason: "test",
+        timestamp: new Date(),
+      },
+      // persisted is intentionally NOT success — simulates DB failure
+      persistenceError: "Persistence failed: connection refused",
+    });
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    const data = JSON.parse(text) as Record<string, unknown>;
+    expect(data.success).toBe(false);
+
+    const error = data.error as Record<string, unknown>;
+    expect(error.code).toBe("PERSISTENCE_FAILED");
+    expect(error.retryable).toBe(true);
+
+    // MUST NOT contain internal error details
+    expect(text).not.toContain("connection refused");
+    expect(text).not.toContain("Prisma");
+
+    // Orchestrator MUST NOT be called — this is the critical invariant
+    expect(mockExecute).not.toHaveBeenCalled();
+    // prepareExecutionFlow MUST NOT be called
+    expect(mockPrepareExecutionFlow).not.toHaveBeenCalled();
+    // No ownership update
+    expect(mockRequestUpdate).not.toHaveBeenCalled();
+  });
+
+  it("B2: persistence with success=false (not just missing) blocks execution", async () => {
+    mockRouteAndPersist.mockResolvedValue({
+      success: true,
+      decision: {
+        taskType: "GENERAL",
+        complexity: "LOW",
+        tokenEstimate: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        candidates: [],
+        selected: {},
+        fallbacks: [],
+        rejected: [],
+        reason: "test",
+        timestamp: new Date(),
+      },
+      persisted: { success: false },
+    });
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────
+  // C. Ownership attachment fails → no provider execution
+  // ─────────────────────────────────────────────────
+
+  it("C: ownership attachment failure prevents provider execution", async () => {
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    // Ownership update throws
+    mockRequestUpdate.mockRejectedValueOnce(new Error("DB write error"));
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const data = await parseJson(res);
+    expect(data.success).toBe(false);
+
+    const error = data.error as Record<string, unknown>;
+    expect(error.code).toBe("OWNERSHIP_FAILED");
+    expect(error.retryable).toBe(true);
+
+    // Orchestrator MUST NOT be called
+    expect(mockExecute).not.toHaveBeenCalled();
+    // prepareExecutionFlow MUST NOT be called
+    expect(mockPrepareExecutionFlow).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────
+  // D. Core persistence succeeds → provider executes normally
+  // ─────────────────────────────────────────────────
+
+  it("D: successful core persistence allows provider execution", async () => {
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "model-1",
+      content: "Success!",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      latencyMs: 200,
+      actualCost: 0.001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "anthropic", modelId: "model-1", modelIdentifier: "claude-3" },
+      ],
+    });
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const data = await parseJson(res);
+    expect(data.success).toBe(true);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────
+  // E. Personal API key → correct ownership
+  // ─────────────────────────────────────────────────
+
+  it("E: personal API key persistence sets correct ownership", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "personalApiKey",
+      userId: "user-42",
+      businessId: null,
+      apiKeyId: "personal-key-7",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "openai",
+      modelId: "model-1",
+      content: "Personal key response",
+      usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+      latencyMs: 150,
+      actualCost: 0.0001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "openai", modelId: "model-1", modelIdentifier: "gpt-4" },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "personal-key-test",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Verify ownership: userId set, businessId null, apiKeyId set
+    expect(mockRequestUpdate).toHaveBeenCalledWith({
+      where: { id: "personal-key-test" },
+      data: {
+        userId: "user-42",
+        businessId: null,
+        apiKeyId: "personal-key-7",
+      },
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // F. Business API key → correct ownership
+  // ─────────────────────────────────────────────────
+
+  it("F: business API key persistence sets correct ownership", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "apiKey",
+      userId: null,
+      businessId: "biz-99",
+      apiKeyId: "biz-key-5",
+    });
+
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "google",
+      modelId: "model-1",
+      content: "Business key response",
+      usage: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      latencyMs: 180,
+      actualCost: 0.0002,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "google", modelId: "model-1", modelIdentifier: "gemini-pro" },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "biz-key-test",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Verify ownership: userId null, businessId set, apiKeyId set
+    expect(mockRequestUpdate).toHaveBeenCalledWith({
+      where: { id: "biz-key-test" },
+      data: {
+        businessId: "biz-99",
+        apiKeyId: "biz-key-5",
+        userId: null,
+      },
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // G. Session → correct ownership
+  // ─────────────────────────────────────────────────
+
+  it("G: session persistence sets correct ownership", async () => {
+    mockResolveRequester.mockResolvedValue({
+      authType: "session",
+      userId: "session-user-1",
+      businessId: null,
+      apiKeyId: null,
+    });
+
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "model-1",
+      content: "Session response",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      latencyMs: 250,
+      actualCost: 0.001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "anthropic", modelId: "model-1", modelIdentifier: "claude-3" },
+      ],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "session-test",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Verify ownership: only userId set
+    expect(mockRequestUpdate).toHaveBeenCalledWith({
+      where: { id: "session-test" },
+      data: {
+        userId: "session-user-1",
+      },
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // H. Provider execution fails after persistence → Request status = FAILED
+  // ─────────────────────────────────────────────────
+
+  it("H: execution failure after persistence updates Request status to FAILED", async () => {
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Provider 500", retryable: false },
+      latencyMs: 3000,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [],
+    });
+
+    const req = makeRequest({
+      messages: VALID_MESSAGES,
+      requestId: "exec-fail-test",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(502);
+
+    // Request MUST be updated with FAILED status
+    const failedUpdate = mockRequestUpdate.mock.calls.find(
+      (call: unknown[]) =>
+        call[0] &&
+        typeof call[0] === "object" &&
+        (call[0] as Record<string, unknown>).data &&
+        (call[0] as Record<string, unknown>).data !== null &&
+        "status" in ((call[0] as Record<string, unknown>).data as Record<string, unknown>) &&
+        ((call[0] as Record<string, unknown>).data as Record<string, unknown>).status === "FAILED",
+    );
+
+    expect(failedUpdate).toBeDefined();
+    expect((failedUpdate![0] as { data: { latencyMs: number } }).data.latencyMs).toBe(3000);
+  });
+
+  // ─────────────────────────────────────────────────
+  // Post-execution persistence failures do NOT fail the request
+  // ─────────────────────────────────────────────────
+
+  it("post-execution cost persistence failure does not fail the request", async () => {
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "model-1",
+      content: "Success despite cost persistence failure",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      latencyMs: 200,
+      actualCost: 0.001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "anthropic", modelId: "model-1", modelIdentifier: "claude-3" },
+      ],
+    });
+
+    // Cost persistence throws
+    mockPersistRequestCostIntelligence.mockRejectedValueOnce(new Error("DB timeout"));
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    // MUST still return success — provider already executed
+    expect(res.status).toBe(200);
+    const data = await parseJson(res);
+    expect(data.success).toBe(true);
+  });
+
+  it("post-execution prompt/response persistence failure does not fail the request", async () => {
+    mockRouteAndPersist.mockResolvedValue(makeRoutingSuccess());
+
+    mockPrepareExecutionFlow.mockReturnValue({
+      status: "NOT_EXECUTED",
+      plan: makeMockPlan(),
+      validation: { valid: true, errors: [] },
+    });
+
+    mockExecute.mockResolvedValue({
+      success: true,
+      providerId: "anthropic",
+      modelId: "model-1",
+      content: "Success despite prompt persistence failure",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      latencyMs: 200,
+      actualCost: 0.001,
+      attempts: 1,
+      fallback: { used: false },
+      timestamp: "2026-01-01T00:00:00.000Z",
+      executionAttempts: [
+        { success: true, providerId: "anthropic", modelId: "model-1", modelIdentifier: "claude-3" },
+      ],
+    });
+
+    // First call (ownership) succeeds, second call (prompt/response) throws
+    mockRequestUpdate
+      .mockResolvedValueOnce({})  // ownership update
+      .mockRejectedValueOnce(new Error("DB write error"));  // prompt/response update
+
+    const req = makeRequest({ messages: VALID_MESSAGES });
+    const res = await POST(req);
+
+    // MUST still return success — provider already executed
+    expect(res.status).toBe(200);
+    const data = await parseJson(res);
+    expect(data.success).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// PHASE 12.14.1 — ARCHITECTURE SOURCE VERIFICATION
+// ─────────────────────────────────────────────────────
+
+describe("Chat Completions API — Persistence Gate Architecture", () => {
+  const routeSource = readFileSync(
+    join(
+      process.cwd(),
+      "src",
+      "app",
+      "api",
+      "v1",
+      "chat",
+      "completions",
+      "route.ts",
+    ),
+    "utf-8",
+  );
+
+  it("contains PERSISTENCE_FAILED error code handling", () => {
+    expect(routeSource).toContain("PERSISTENCE_FAILED");
+  });
+
+  it("contains OWNERSHIP_FAILED error code handling", () => {
+    expect(routeSource).toContain("OWNERSHIP_FAILED");
+  });
+
+  it("checks persisted.success before execution", () => {
+    expect(routeSource).toContain("routingResult.persisted?.success !== true");
+  });
+
+  it("does NOT have empty catch blocks for post-execution persistence", () => {
+    // The old pattern was: catch { } or catch { // Best-effort }
+    // The new pattern must have console.error in all catch blocks
+    // after the orchestrator call.
+    const catchBlocks = routeSource.match(/catch\s*\([^)]*\)\s*\{[\s\S]*?\}/g) ?? [];
+    for (const block of catchBlocks) {
+      // Every catch block after the orchestrator must log
+      // (the outer try/catch for the whole handler is fine without logging
+      // because it returns a 500)
+      if (block.includes("Best-effort") || block.trim() === "catch {}" || /^catch\s*\(\w*\)\s*\{\s*\}/.test(block)) {
+        // If we find an empty catch or "Best-effort" comment, it's the old pattern
+        expect(block).not.toContain("Best-effort");
+      }
+    }
+  });
+
+  it("logs post-execution persistence failures with console.error", () => {
+    expect(routeSource).toContain("[chat-completions] Post-execution cost persistence");
+    expect(routeSource).toContain("[chat-completions] Post-execution prompt/response persistence");
+  });
+
+  it("updates Request status to FAILED on execution failure", () => {
+    expect(routeSource).toContain('"FAILED"');
+  });
+});

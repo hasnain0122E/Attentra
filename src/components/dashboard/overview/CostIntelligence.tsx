@@ -4,7 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   ChartLineUp,
-  CurrencyDollar,
+  Coins,
   Gauge,
 } from "@phosphor-icons/react";
 
@@ -214,7 +214,7 @@ export default function CostIntelligence() {
               Actual spend
             </div>
 
-            <CurrencyDollar
+            <Coins
               size={15}
               className="text-[var(--color-accent)]"
             />

@@ -3,32 +3,45 @@ import type { ElementType } from "react";
 import {
   Clock,
   Key,
-  UsersThree,
   ChartBar,
 } from "@phosphor-icons/react/dist/ssr";
 
-import type { BusinessRequestItem } from "@/lib/business/request-data";
+import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
+
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 interface BusinessRequestTelemetryProps {
-  request: BusinessRequestItem;
+  request: BusinessRequestHistoryItem;
 }
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "—";
+    return "\u2014";
   }
 
-  return `$${value.toFixed(6)}`;
+  return formatDisplayCurrency(value);
 }
 
-function formatLatency(value: number) {
+function formatLatency(value: number | null | undefined) {
+  if (!value || value <= 0) {
+    return "\u2014";
+  }
+
   if (value < 1000) {
-    return `${value}ms`;
+    return `${Math.round(value)}ms`;
   }
 
   return `${(value / 1000).toFixed(
     2,
   )}s`;
+}
+
+function formatRoutingDetail(ms: number | null | undefined) {
+  if (!ms || ms <= 0) {
+    return "Routing latency not measured";
+  }
+
+  return `${Math.round(ms)}ms routing`;
 }
 
 export default function BusinessRequestTelemetry({
@@ -46,7 +59,9 @@ export default function BusinessRequestTelemetry({
           value={formatLatency(
             request.latencyMs,
           )}
-          detail={`${request.routingLatencyMs}ms routing`}
+          detail={formatRoutingDetail(
+            request.routingLatencyMs,
+          )}
           icon={Clock}
         />
 
@@ -74,16 +89,16 @@ export default function BusinessRequestTelemetry({
         />
 
         <TelemetryItem
-          label="Member"
-          value={request.member.name}
-          detail={request.member.role}
-          icon={UsersThree}
+          label="Requester"
+          value={request.requester}
+          detail="Organization API key"
+          icon={Key}
         />
 
         <TelemetryItem
           label="API key"
-          value={request.apiKey.name}
-          detail={request.apiKey.prefix}
+          value={request.apiKeyName}
+          detail={request.apiKeyPrefix}
           icon={Key}
         />
 

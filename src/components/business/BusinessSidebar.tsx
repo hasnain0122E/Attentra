@@ -13,18 +13,18 @@ import { usePathname } from "next/navigation";
 import {
   ArrowUpRight,
   Buildings,
-  ChartBar,
   ClockCounterClockwise,
   GearSix,
   GridFour,
   Key,
-  Robot,
   SignOut,
   UsersThree,
   X,
 } from "@phosphor-icons/react";
 
 import { signOut } from "next-auth/react";
+
+import { useBusiness } from "@/components/business/BusinessContext";
 
 interface BusinessSidebarProps {
   mobileOpen: boolean;
@@ -42,16 +42,6 @@ const organizationNavigation = [
     label: "Requests",
     href: "/business/requests",
     icon: ClockCounterClockwise,
-  },
-  {
-    label: "Routing",
-    href: "/business/routing",
-    icon: ChartBar,
-  },
-  {
-    label: "Models",
-    href: "/business/models",
-    icon: Robot,
   },
   {
     label: "Members",
@@ -79,6 +69,7 @@ export default function BusinessSidebar({
 }: BusinessSidebarProps) {
   const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
+  const { business } = useBusiness();
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -170,7 +161,7 @@ export default function BusinessSidebar({
 
               <div className="min-w-0">
                 <div className="truncate text-[11px] font-semibold text-[var(--color-foreground)]">
-                  Acme AI
+                  {business?.name ?? "Loading\u2026"}
                 </div>
 
                 <div className="mt-1 font-mono text-[7px] uppercase tracking-[0.14em] text-[var(--color-foreground-muted)]">

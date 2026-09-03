@@ -1,21 +1,33 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { Warning, X } from "@phosphor-icons/react";
 
-import type { BusinessApiKeyData } from "./BusinessApiKeysClient";
-
 interface RevokeBusinessApiKeyModalProps {
-  apiKey: BusinessApiKeyData | null;
+  keyName: string;
   onClose: () => void;
   onConfirm: () => void;
 }
 
 export default function RevokeBusinessApiKeyModal({
-  apiKey,
+  keyName,
   onClose,
   onConfirm,
 }: RevokeBusinessApiKeyModalProps) {
-  if (!apiKey) return null;
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -48,7 +60,7 @@ export default function RevokeBusinessApiKeyModal({
         <p className="mt-3 text-[9px] leading-5 text-[var(--color-foreground-secondary)]">
           Applications using{" "}
           <span className="font-semibold text-[var(--color-foreground)]">
-            {apiKey.name}
+            {keyName}
           </span>{" "}
           would no longer be able to authenticate with this credential.
         </p>
@@ -59,11 +71,7 @@ export default function RevokeBusinessApiKeyModal({
           </div>
 
           <div className="mt-2 text-[10px] font-semibold text-[var(--color-foreground)]">
-            {apiKey.name}
-          </div>
-
-          <div className="mt-1 font-mono text-[7px] text-[var(--color-foreground-muted)]">
-            {apiKey.keyPrefix}
+            {keyName}
           </div>
         </div>
 

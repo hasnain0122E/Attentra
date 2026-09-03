@@ -3,7 +3,7 @@
 import {
   Buildings,
   ChartLineUp,
-  CurrencyDollar,
+  Coins,
   UsersThree,
 } from "@phosphor-icons/react";
 
@@ -232,7 +232,7 @@ export default function BusinessCostIntelligence() {
               Actual spend
             </span>
 
-            <CurrencyDollar
+            <Coins
               size={15}
               className="text-[var(--color-accent)]"
             />

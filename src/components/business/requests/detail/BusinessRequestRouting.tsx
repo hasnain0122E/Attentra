@@ -3,18 +3,55 @@ import {
   CheckCircle,
 } from "@phosphor-icons/react/dist/ssr";
 
-import type { BusinessRequestItem } from "@/lib/business/request-data";
+import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
+
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 interface BusinessRequestRoutingProps {
-  request: BusinessRequestItem;
+  request: BusinessRequestHistoryItem;
 }
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "—";
+    return "\u2014";
   }
 
-  return `$${value.toFixed(6)}`;
+  return formatDisplayCurrency(value);
+}
+
+/**
+ * Format a latency value for display.
+ * Returns em-dash for zero/null/undefined (no measurement available).
+ */
+function formatLatency(value: number | null | undefined): string {
+  if (!value || value <= 0) {
+    return "\u2014";
+  }
+
+  if (value < 1000) {
+    return `${Math.round(value)}ms`;
+  }
+
+  return `${(value / 1000).toFixed(2)}s`;
+}
+
+/**
+ * Build a concise, human-readable routing explanation from persisted data.
+ * Uses the same pattern as the consumer RequestRoutingOverview component.
+ */
+function buildConciseReason(request: BusinessRequestHistoryItem): string {
+  const scoreText = request.routingScore > 0
+    ? `routing score ${request.routingScore.toFixed(2)}`
+    : "routing score";
+  const costText = request.projectedCost !== undefined
+    ? `projected cost (${formatCost(request.projectedCost)})`
+    : "projected cost";
+
+  return (
+    `${request.routedModel} was selected for this ` +
+    `${request.complexity.toLowerCase()}-complexity ${request.taskType.toLowerCase()} request ` +
+    `based on capability, latency, and ${costText}.`
+  );
 }
 
 export default function BusinessRequestRouting({
@@ -67,7 +104,7 @@ export default function BusinessRequestRouting({
             </div>
 
             <p className="mt-4 text-[11px] leading-6 text-white/65">
-              {request.routingReason}
+              {buildConciseReason(request)}
             </p>
           </div>
 
@@ -81,7 +118,7 @@ export default function BusinessRequestRouting({
 
             <Metric
               label="Routing latency"
-              value={`${request.routingLatencyMs}ms`}
+              value={formatLatency(request.routingLatencyMs)}
             />
 
             <Metric

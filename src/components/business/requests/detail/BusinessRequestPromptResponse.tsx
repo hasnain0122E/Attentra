@@ -6,17 +6,15 @@ import {
 } from "react";
 
 import {
-  Buildings,
   Check,
   Copy,
   Key,
-  UsersThree,
 } from "@phosphor-icons/react";
 
-import type { BusinessRequestItem } from "@/lib/business/request-data";
+import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
 
 interface BusinessRequestPromptResponseProps {
-  request: BusinessRequestItem;
+  request: BusinessRequestHistoryItem;
 }
 
 export default function BusinessRequestPromptResponse({
@@ -46,24 +44,17 @@ export default function BusinessRequestPromptResponse({
       {/* Organization context */}
       <div className="grid gap-3 sm:grid-cols-3">
         <ContextCard
-          icon={Buildings}
-          label="Organization"
-          value="Acme AI"
-          detail="Business workspace"
-        />
-
-        <ContextCard
-          icon={UsersThree}
-          label="Member"
-          value={request.member.name}
-          detail={request.member.role}
+          icon={Key}
+          label="Requester"
+          value={request.requester}
+          detail="Organization API key"
         />
 
         <ContextCard
           icon={Key}
           label="API key"
-          value={request.apiKey.name}
-          detail={request.apiKey.prefix}
+          value={request.apiKeyName}
+          detail={request.apiKeyPrefix}
         />
       </div>
 

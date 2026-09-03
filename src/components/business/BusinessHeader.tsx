@@ -7,6 +7,8 @@ import {
 
 import { usePathname } from "next/navigation";
 
+import { useBusiness } from "@/components/business/BusinessContext";
+
 interface BusinessHeaderProps {
   onOpenSidebar: () => void;
 }
@@ -40,6 +42,7 @@ export default function BusinessHeader({
   onOpenSidebar,
 }: BusinessHeaderProps) {
   const pathname = usePathname();
+  const { business } = useBusiness();
 
   const currentPage =
     getPageName(pathname);
@@ -78,7 +81,7 @@ export default function BusinessHeader({
         <div className="flex shrink-0 items-center gap-2">
           <div className="hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 lg:block">
             <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
-              Acme AI
+              {business?.name ?? "Loading\u2026"}
             </span>
           </div>
 

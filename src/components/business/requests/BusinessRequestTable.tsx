@@ -9,15 +9,21 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 
-import type { BusinessRequestItem } from "@/lib/business/request-data";
+import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
+
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 interface BusinessRequestTableProps {
-  requests: BusinessRequestItem[];
+  requests: BusinessRequestHistoryItem[];
 }
 
-function formatLatency(value: number) {
+function formatLatency(value: number | null | undefined) {
+  if (!value || value <= 0) {
+    return "\u2014";
+  }
+
   if (value < 1000) {
-    return `${value}ms`;
+    return `${Math.round(value)}ms`;
   }
 
   return `${(value / 1000).toFixed(2)}s`;
@@ -25,10 +31,10 @@ function formatLatency(value: number) {
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "—";
+    return "\u2014";
   }
 
-  return `$${value.toFixed(6)}`;
+  return formatDisplayCurrency(value);
 }
 
 function formatDate(value: string) {
@@ -83,16 +89,16 @@ export default function BusinessRequestTable({
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[var(--color-surface-soft)] font-mono text-[8px] font-semibold text-[var(--color-foreground-secondary)]">
-                    {request.member.initials}
+                    {request.requester.slice(0, 2).toUpperCase()}
                   </div>
 
                   <div className="min-w-0">
                     <div className="truncate text-[11px] font-semibold text-[var(--color-foreground)]">
-                      {request.member.name}
+                      {request.requester}
                     </div>
 
                     <div className="mt-1 font-mono text-[6px] uppercase tracking-[0.08em] text-[var(--color-foreground-muted)]">
-                      {request.apiKey.name}
+                      {request.apiKeyName}
                     </div>
                   </div>
                 </div>
@@ -193,16 +199,16 @@ export default function BusinessRequestTable({
               {/* Member */}
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-soft)] font-mono text-[8px] font-semibold text-[var(--color-foreground-secondary)]">
-                  {request.member.initials}
+                  {request.requester.slice(0, 2).toUpperCase()}
                 </div>
 
                 <div className="min-w-0">
                   <div className="truncate text-[10px] font-semibold text-[var(--color-foreground)]">
-                    {request.member.name}
+                    {request.requester}
                   </div>
 
                   <div className="mt-1 truncate font-mono text-[7px] uppercase tracking-[0.07em] text-[var(--color-foreground-muted)]">
-                    {request.apiKey.name}
+                    {request.apiKeyName}
                   </div>
                 </div>
               </div>
@@ -406,7 +412,7 @@ function ModelLabel({
 function StatusBadge({
   status,
 }: {
-  status: BusinessRequestItem["status"];
+  status: BusinessRequestHistoryItem["status"];
 }) {
   if (status === "FAILED") {
     return (

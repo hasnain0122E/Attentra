@@ -7,10 +7,10 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 
-import type { BusinessRequestItem } from "@/lib/business/request-data";
+import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
 
 interface BusinessRequestDetailHeaderProps {
-  request: BusinessRequestItem;
+  request: BusinessRequestHistoryItem;
 }
 
 function formatDate(value: string) {
@@ -83,7 +83,7 @@ export default function BusinessRequestDetailHeader({
 function StatusBadge({
   status,
 }: {
-  status: BusinessRequestItem["status"];
+  status: BusinessRequestHistoryItem["status"];
 }) {
   if (status === "FAILED") {
     return (

@@ -15,17 +15,11 @@ export default function RequestsPage() {
 
           <p className="mt-3 max-w-[680px] text-[11px] leading-6 text-[var(--color-foreground-secondary)]">
             Review requests generated across
-            members and shared applications,
+            shared applications and API keys,
             including routing outcomes,
             fallback activity, model execution,
             latency, and request-level cost.
           </p>
-        </div>
-
-        <div className="w-fit rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5">
-          <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
-            Acme AI
-          </span>
         </div>
       </div>
 

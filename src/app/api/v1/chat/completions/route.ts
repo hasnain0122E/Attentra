@@ -12,12 +12,20 @@
  *     → validation
  *     → authentication
  *     → routeAndPersist()            (Phase 6 routing + persistence)
+ *     → VERIFY core persistence      (Phase 12.14.1 reliability gate)
  *     → attach authenticated user ownership
+ *     → VERIFY ownership persistence  (Phase 12.14.1 reliability gate)
  *     → prepareExecutionFlow()       (Phase 6→7 boundary)
  *     → ExecutionOrchestrator        (Phase 7 Step 4)
  *     → Dispatcher → ProviderAdapter (Phase 7 Step 2–3)
  *     → persist request cost intelligence
  *     → normalized response
+ *
+ * Phase 12.14.1 — Core Persistence Reliability Gate:
+ *   Provider execution MUST NOT begin unless core persistence
+ *   (Request + RoutingDecision + ownership) has succeeded.
+ *   If core persistence fails, the route returns a normalized
+ *   error WITHOUT calling any provider.
  *
  * This route is an orchestration boundary ONLY. It does not:
  * - Choose models or score candidates
@@ -87,6 +95,8 @@ function errorToHttpStatus(code: string): number {
       return 400;
 
     case "DATABASE_ERROR":
+    case "PERSISTENCE_FAILED":
+    case "OWNERSHIP_FAILED":
       return 500;
 
     default:
@@ -345,36 +355,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── 6a. Core persistence gate ────────────────────
+    //
+    // Phase 12.14.1 — Reliability gate.
+    //
+    // Routing succeeded but Request + RoutingDecision persistence
+    // did NOT. A provider MUST NOT be called when Attentra cannot
+    // establish the authoritative Request record.
+    //
+    // This prevents:
+    // - Untracked/unauditable provider executions
+    // - Provider credit consumption without any DB record
+    // - Orphaned cost data with no Request to attach to
+    if (routingResult.persisted?.success !== true) {
+      // Surface the persistence failure internally.
+      console.error(
+        "[chat-completions] Core persistence failed after successful routing.",
+        "requestId:", effectiveRequestId,
+        "persistenceError:", routingResult.persistenceError ?? "unknown",
+      );
+
+      return NextResponse.json(
+        buildErrorResponse(effectiveRequestId, {
+          code: "PERSISTENCE_FAILED",
+          message: "Attentra could not persist the request. Please retry.",
+          retryable: true,
+        }),
+        { status: 500 },
+      );
+    }
+
     // ── 7. Attach request ownership ─────────────────
     //
     // Session requests: owned by the authenticated user.
     // Business API-key requests: owned by the business workspace.
     // Personal API-key requests: owned by the individual user.
     //
-    // routeAndPersist() owns routing persistence and intentionally
-    // does not depend on authentication. The API attaches trusted
-    // ownership after routing succeeds.
-    //
-    // Gate on persisted.success (not decisionId) because the
-    // ownership update uses effectiveRequestId — it does not need
-    // the RoutingDecision ID. Checking decisionId could silently
-    // skip ownership when the post-transaction findUnique returns
-    // null despite a successful upsert.
-    if (routingResult.persisted?.success) {
-      const ownershipData: Record<string, string | null> = {};
+    // Phase 12.14.1 — Ownership is core data. If ownership
+    // attachment fails, the provider MUST NOT be called.
+    // An unowned/misattributed Request is a data integrity
+    // violation.
+    const ownershipData: Record<string, string | null> = {};
 
-      if (requester.authType === "session") {
-        ownershipData.userId = requester.userId;
-      } else if (requester.authType === "apiKey") {
-        ownershipData.businessId = requester.businessId;
-        ownershipData.apiKeyId = requester.apiKeyId;
-        ownershipData.userId = null;
-      } else if (requester.authType === "personalApiKey") {
-        ownershipData.userId = requester.userId;
-        ownershipData.businessId = null;
-        ownershipData.apiKeyId = requester.apiKeyId;
-      }
+    if (requester.authType === "session") {
+      ownershipData.userId = requester.userId;
+    } else if (requester.authType === "apiKey") {
+      ownershipData.businessId = requester.businessId;
+      ownershipData.apiKeyId = requester.apiKeyId;
+      ownershipData.userId = null;
+    } else if (requester.authType === "personalApiKey") {
+      ownershipData.userId = requester.userId;
+      ownershipData.businessId = null;
+      ownershipData.apiKeyId = requester.apiKeyId;
+    }
 
+    try {
       await prisma.request.update({
         where: {
           id: effectiveRequestId,
@@ -382,6 +417,22 @@ export async function POST(request: NextRequest) {
 
         data: ownershipData,
       });
+    } catch (ownershipError) {
+      console.error(
+        "[chat-completions] Ownership attachment failed after core persistence.",
+        "requestId:", effectiveRequestId,
+        "authType:", requester.authType,
+        "error:", ownershipError instanceof Error ? ownershipError.message : "unknown",
+      );
+
+      return NextResponse.json(
+        buildErrorResponse(effectiveRequestId, {
+          code: "OWNERSHIP_FAILED",
+          message: "Attentra could not establish request ownership. Please retry.",
+          retryable: true,
+        }),
+        { status: 500 },
+      );
     }
 
     // ── 8. Build execution plan ───────────────────────
@@ -426,21 +477,43 @@ export async function POST(request: NextRequest) {
 
     // ── 10. Successful execution ──────────────────────
     if (result.success) {
+      // ── 10a. Persist cost intelligence ─────────────
+      //
+      // Phase 12.14.1 — Post-execution persistence is SECONDARY.
+      // The provider has already executed, so we must NOT return
+      // a retryable error that could cause duplicate execution.
+      // However, failures must no longer be completely invisible.
       if (result.usage && result.modelId) {
-        await persistRequestCostIntelligence(prisma, {
-          requestId: effectiveRequestId,
-          executedModelId: result.modelId,
+        try {
+          const costResult = await persistRequestCostIntelligence(prisma, {
+            requestId: effectiveRequestId,
+            executedModelId: result.modelId,
 
-          usage: {
-            inputTokens: result.usage.inputTokens,
-            outputTokens: result.usage.outputTokens,
-          },
+            usage: {
+              inputTokens: result.usage.inputTokens,
+              outputTokens: result.usage.outputTokens,
+            },
 
-          actualCost: result.actualCost,
-        });
+            actualCost: result.actualCost,
+          });
+
+          if (!costResult.persisted) {
+            console.error(
+              "[chat-completions] Post-execution cost persistence not persisted.",
+              "requestId:", effectiveRequestId,
+              "reason:", costResult.reason ?? "unknown",
+            );
+          }
+        } catch (costError) {
+          console.error(
+            "[chat-completions] Post-execution cost persistence threw.",
+            "requestId:", effectiveRequestId,
+            "error:", costError instanceof Error ? costError.message : "unknown",
+          );
+        }
       }
 
-      // ── 10a. Persist prompt + response ────────────
+      // ── 10b. Persist prompt + response ────────────
       const promptText = messages
         .filter((m: { role: string }) => m.role === "user")
         .map((m: { content: string }) => m.content)
@@ -456,9 +529,14 @@ export async function POST(request: NextRequest) {
             latencyMs: result.latencyMs ?? null,
           },
         });
-      } catch {
-        // Best-effort — prompt/response/latency persistence must not
-        // fail the overall request.
+      } catch (promptError) {
+        // Post-execution: provider already consumed credits.
+        // Log for observability but do NOT return a retryable error.
+        console.error(
+          "[chat-completions] Post-execution prompt/response persistence failed.",
+          "requestId:", effectiveRequestId,
+          "error:", promptError instanceof Error ? promptError.message : "unknown",
+        );
       }
 
       return NextResponse.json(
@@ -472,6 +550,27 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 11. Execution failure ─────────────────────────
+    //
+    // Phase 12.14.1 — Because core persistence always succeeds
+    // before execution, the Request row always exists at this
+    // point. Update its status to reflect the failure so that
+    // history/auditability is preserved.
+    try {
+      await prisma.request.update({
+        where: { id: effectiveRequestId },
+        data: {
+          status: "FAILED",
+          latencyMs: result.latencyMs ?? null,
+        },
+      });
+    } catch (statusError) {
+      console.error(
+        "[chat-completions] Failed to persist FAILED status after execution failure.",
+        "requestId:", effectiveRequestId,
+        "error:", statusError instanceof Error ? statusError.message : "unknown",
+      );
+    }
+
     const errorStatus = errorToHttpStatus(
       result.error?.code ?? "UNKNOWN",
     );
