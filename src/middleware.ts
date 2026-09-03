@@ -1,6 +1,11 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+import { authConfig } from "@/auth.config";
+
+// Edge-safe auth instance — must NOT import @/auth (Prisma-backed).
+const { auth } = NextAuth(authConfig);
 
 interface NextAuthRequest extends NextRequest {
   auth: import("next-auth").Session | null;

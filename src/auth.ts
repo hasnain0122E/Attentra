@@ -1,41 +1,20 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
+import { authConfig } from "@/auth.config";
+
+/**
+ * Full (Node runtime) Auth.js configuration.
+ *
+ * Spreads the Edge-safe base config from @/auth.config and adds the
+ * Prisma-backed adapter. This module must NOT be imported by middleware —
+ * PrismaAdapter/@prisma/client would enter the Edge bundle.
+ */
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
+
   adapter: PrismaAdapter(prisma),
-
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-
-  session: {
-    strategy: "jwt",
-  },
-
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    },
-
-    session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-      }
-      return session;
-    },
-  },
-
-  pages: {
-    signIn: "/login",
-  },
 
   events: {
     async signIn({ user }) {
