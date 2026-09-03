@@ -7,6 +7,8 @@ import {
 
 import type { RoutingDisplayData } from "@/types/dashboard";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface DecisionDetailProps {
   routing: RoutingDisplayData;
 }
@@ -41,7 +43,7 @@ const factors = [
 function buildConciseReason(routing: RoutingDisplayData): string {
   const selected = routing.candidates.find((c) => c.selected);
   const scoreText = selected ? `routing score ${selected.score.toFixed(2)}` : "routing score";
-  const costText = `$${routing.projectedCost.toFixed(6)}`;
+  const costText = formatDisplayCurrency(routing.projectedCost);
 
   return (
     `Selected ${routing.selectedModelDisplayName} for this ` +
@@ -111,7 +113,7 @@ export default function DecisionDetail({
               </div>
 
               <div className="mt-2 font-mono text-[11px] font-medium">
-                ${routing.projectedCost.toFixed(6)}
+                {formatDisplayCurrency(routing.projectedCost)}
               </div>
             </div>
           </div>

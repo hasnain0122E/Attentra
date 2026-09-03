@@ -9,6 +9,8 @@ import type { ReactNode } from "react";
 
 import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface RequestRoutingOverviewProps {
   request: RequestHistoryItem;
 }
@@ -18,7 +20,7 @@ function formatCost(value?: number) {
     return "\u2014";
   }
 
-  return `$${value.toFixed(6)}`;
+  return formatDisplayCurrency(value);
 }
 
 function buildConciseReason(request: RequestHistoryItem): string {

@@ -11,6 +11,8 @@ import {
 
 import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface HistoryTableProps {
   requests: RequestHistoryItem[];
 }
@@ -25,10 +27,10 @@ function formatLatency(value: number) {
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "—";
+    return "\u2014";
   }
 
-  return `$${value.toFixed(6)}`;
+  return formatDisplayCurrency(value);
 }
 
 function formatDate(value: string) {

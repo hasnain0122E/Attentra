@@ -15,24 +15,26 @@ import {
   TerminalWindow,
 } from "@phosphor-icons/react";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 const models = [
   {
     name: "GPT-4.1",
     provider: "OpenAI",
     latency: "620ms",
-    cost: "$0.012",
+    cost: 0.012,
   },
   {
     name: "Claude Sonnet",
     provider: "Anthropic",
     latency: "480ms",
-    cost: "$0.008",
+    cost: 0.008,
   },
   {
     name: "Gemini Flash",
     provider: "Google",
     latency: "210ms",
-    cost: "$0.003",
+    cost: 0.003,
   },
 ];
 
@@ -468,7 +470,7 @@ function ModelNode({
     name: string;
     provider: string;
     latency: string;
-    cost: string;
+    cost: number;
   };
   index: number;
 }) {
@@ -533,7 +535,7 @@ function ModelNode({
           </div>
 
           <div className="mt-1 text-xs font-medium text-white">
-            {model.cost}
+            {formatDisplayCurrency(model.cost)}
           </div>
         </div>
       </div>

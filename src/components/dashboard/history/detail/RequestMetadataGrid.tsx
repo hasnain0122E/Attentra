@@ -11,16 +11,18 @@ import type { ElementType } from "react";
 
 import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface RequestMetadataGridProps {
   request: RequestHistoryItem;
 }
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "—";
+    return "\u2014";
   }
 
-  return `$${value.toFixed(6)}`;
+  return formatDisplayCurrency(value);
 }
 
 function formatLatency(value: number) {

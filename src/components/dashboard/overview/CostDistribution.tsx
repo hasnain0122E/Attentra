@@ -4,22 +4,10 @@ import type {
   ConsumerCostAnalytics,
 } from "@/lib/cost-intelligence";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface CostDistributionProps {
   analytics: ConsumerCostAnalytics;
-}
-
-function formatCurrency(
-  value: number,
-) {
-  if (value === 0) {
-    return "$0.0000";
-  }
-
-  if (Math.abs(value) < 0.0001) {
-    return `$${value.toFixed(6)}`;
-  }
-
-  return `$${value.toFixed(4)}`;
 }
 
 export default function CostDistribution({
@@ -87,7 +75,7 @@ export default function CostDistribution({
             </div>
 
             <div className="min-w-[68px] text-right font-mono text-[9px] text-[var(--color-foreground-secondary)]">
-              {formatCurrency(
+              {formatDisplayCurrency(
                 model.actualSpend,
               )}
             </div>

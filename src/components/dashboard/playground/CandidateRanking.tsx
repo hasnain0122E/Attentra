@@ -5,12 +5,10 @@ import {
 
 import type { RoutingCandidateDisplayData } from "@/types/dashboard";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface CandidateRankingProps {
   candidates: RoutingCandidateDisplayData[];
-}
-
-function formatCost(cost: number) {
-  return `$${cost.toFixed(6)}`;
 }
 
 export default function CandidateRanking({
@@ -122,7 +120,7 @@ export default function CandidateRanking({
                 </div>
 
                 <div className="mt-1 font-mono text-[9px] text-[var(--color-foreground)] lg:mt-0">
-                  {formatCost(candidate.projectedCost)}
+                  {formatDisplayCurrency(candidate.projectedCost)}
                 </div>
               </div>
 

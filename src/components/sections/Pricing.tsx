@@ -7,66 +7,54 @@ import {
   CurrencyDollar,
   Gauge,
   GitBranch,
+  Lightning,
   Sparkle,
 } from "@phosphor-icons/react";
 
 const plans = [
   {
-    name: "Developer",
-    eyebrow: "FOR EXPERIMENTS",
+    name: "Free Access",
+    eyebrow: "GET STARTED",
     description:
-      "Explore intelligent routing and build your first AI workflows.",
-    price: "$0",
-    period: "forever",
+      "Explore intelligent routing, inspect decisions, and validate savings — at no platform cost.",
+    priceDisplay: "PKR 0",
+    period: "/ month",
+    highlight: null as string | null,
     features: [
-      "1,000 routed requests",
-      "Core intelligent routing",
-      "Multiple model providers",
-      "Basic usage analytics",
-      "API access",
+      "Playground access",
+      "Intelligent model routing",
+      "Request history",
+      "Routing analytics",
+      "Cost intelligence",
+      "Baseline comparison",
+      "Model performance insights",
+      "No credit card required",
     ],
-    cta: "Start building",
-    href: "#product-demo",
+    cta: "Start for free",
+    href: "/signup",
     featured: false,
   },
   {
-    name: "Scale",
-    eyebrow: "FOR PRODUCTION",
+    name: "Production API",
+    eyebrow: "PAY AS YOU GO",
     description:
-      "Optimize production AI workloads across cost, latency, and quality.",
-    price: "$49",
-    period: "per month",
+      "Route production traffic through Attentra. Pay for your model usage plus 10% of the verified savings Attentra generates.",
+    priceDisplay: null as string | null,
+    period: null as string | null,
+    highlight: "10% of verified savings",
     features: [
-      "50,000 routed requests",
-      "Advanced routing policies",
-      "Cost-aware routing",
-      "Latency-aware routing",
-      "Usage & routing analytics",
-      "API access",
-      "Priority support",
+      "Production API access",
+      "API keys for workspace members",
+      "Multi-model intelligent routing",
+      "Automatic fallback execution",
+      "Usage and spend tracking",
+      "Business analytics dashboard",
+      "Cost optimization intelligence",
+      "Baseline cost comparison",
     ],
-    cta: "Start scaling",
-    href: "#product-demo",
+    cta: "Start routing",
+    href: "/signup",
     featured: true,
-  },
-  {
-    name: "Enterprise",
-    eyebrow: "FOR AI AT SCALE",
-    description:
-      "Custom infrastructure and routing intelligence for high-volume teams.",
-    price: "Custom",
-    period: "tailored to you",
-    features: [
-      "Custom request volume",
-      "Custom routing policies",
-      "Dedicated infrastructure",
-      "Advanced observability",
-      "Custom integrations",
-      "SLA & support",
-    ],
-    cta: "Talk to us",
-    href: "#get-started",
-    featured: false,
   },
 ];
 
@@ -117,7 +105,7 @@ export default function Pricing() {
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
-              Simple pricing
+              Performance-based pricing
             </span>
           </motion.div>
 
@@ -137,12 +125,12 @@ export default function Pricing() {
               duration: 0.7,
               delay: 0.1,
             }}
-            className="attentra-display mt-7 text-[var(--color-foreground)]"
+            className="attentra-display mt-7 text-[var(--color-foreground)] sm:text-[3.25rem]"
           >
-            Route smarter.
+            We make money when
             <br />
             <span className="text-[var(--color-accent)]">
-            Scale intelligent.
+            we save you money.
             </span>
           </motion.h2>
 
@@ -162,10 +150,12 @@ export default function Pricing() {
               duration: 0.6,
               delay: 0.2,
             }}
-            className="attentra-body mx-auto mt-6 max-w-2xl text-base sm:text-lg"
+            className="attentra-body mx-auto mt-6 max-w-xl text-base sm:text-lg"
           >
-            Start with the tools you need today and add more
-            routing intelligence as your AI workload grows.
+            Start free. Use Attentra&apos;s Playground, routing insights,
+            request history, and cost intelligence at no platform cost. When
+            you move production traffic through Attentra, pay for your model
+            usage plus 10% of the verified savings Attentra generates.
           </motion.p>
         </div>
 
@@ -173,7 +163,7 @@ export default function Pricing() {
             PRICING GRID
             ========================================================= */}
 
-        <div className="mt-14 grid gap-4 lg:mt-16 lg:grid-cols-3 lg:items-stretch">
+        <div className="mt-14 grid gap-4 lg:mt-16 lg:mx-auto lg:max-w-4xl lg:grid-cols-2 lg:items-stretch">
           {plans.map((plan, index) => (
             <PricingCard
               key={plan.name}
@@ -184,7 +174,7 @@ export default function Pricing() {
         </div>
 
         {/* =========================================================
-            VALUE STATEMENT
+            HOW IT WORKS — SAVINGS FORMULA
             ========================================================= */}
 
         <motion.div
@@ -203,20 +193,41 @@ export default function Pricing() {
             duration: 0.6,
             delay: 0.2,
           }}
-          className="mx-auto mt-8 flex max-w-3xl flex-col items-center justify-center gap-3 text-center sm:flex-row"
+          className="mx-auto mt-10 max-w-3xl rounded-[1.5rem] border border-[var(--color-border)] bg-white px-6 py-6 sm:px-8 sm:py-8"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-            <Sparkle size={14} />
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
+              <Sparkle size={14} />
+            </div>
+
+            <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-[var(--color-accent)]">
+              How the optimization fee works
+            </span>
           </div>
 
-          <p className="text-xs leading-5 text-[var(--color-foreground-secondary)]">
-            Your infrastructure shouldn't force every request onto
-            your most expensive model.
-          </p>
+          <div className="mt-5 grid gap-5 sm:grid-cols-3">
+            <FormulaStep
+              step="01"
+              title="Verified Savings"
+              description="Baseline cost minus your actual routed cost. Attentra measures every request."
+            />
+
+            <FormulaStep
+              step="02"
+              title="10% Optimization Fee"
+              description="Attentra charges 10% of positive verified savings only. If savings are zero or negative, the fee is PKR 0."
+            />
+
+            <FormulaStep
+              step="03"
+              title="You Keep 90%"
+              description="Every rupee of verified savings beyond the fee stays with you. The more Attentra saves, the more you benefit."
+            />
+          </div>
         </motion.div>
 
         {/* =========================================================
-            FEATURE STRIP
+            VALUE STRIP
             ========================================================= */}
 
         <motion.div
@@ -235,7 +246,7 @@ export default function Pricing() {
             duration: 0.6,
             delay: 0.3,
           }}
-          className="mt-14 grid overflow-hidden rounded-[1.5rem] border border-[var(--color-border)] bg-white sm:grid-cols-3"
+          className="mt-10 grid overflow-hidden rounded-[1.5rem] border border-[var(--color-border)] bg-white sm:grid-cols-3"
         >
           <Value
             icon={<GitBranch size={15} />}
@@ -250,9 +261,9 @@ export default function Pricing() {
           />
 
           <Value
-            icon={<CurrencyDollar size={15} />}
-            title="Cost conscious"
-            description="Use premium capability when it actually matters."
+            icon={<Lightning size={15} />}
+            title="Automatic fallback"
+            description="If a provider fails, Attentra retries on the next best model."
           />
         </motion.div>
       </div>
@@ -342,15 +353,32 @@ function PricingCard({
         {/* Price */}
 
         <div className="mt-7 border-b border-[var(--color-border)] pb-7">
-          <div className="flex items-end gap-2">
-            <span className="text-4xl font-semibold tracking-[-0.055em] text-[var(--color-foreground)] sm:text-5xl">
-              {plan.price}
-            </span>
+          {plan.highlight ? (
+            <div>
+              <div className="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-accent)] sm:text-4xl">
+                {plan.highlight}
+              </div>
 
-            <span className="pb-1 text-[10px] text-[var(--color-foreground-muted)]">
-              {plan.period}
-            </span>
-          </div>
+              <p className="mt-2 text-[10px] leading-4 text-[var(--color-foreground-muted)]">
+                Attentra&apos;s optimization fee applies only when Attentra
+                reduces your cost relative to your configured baseline. If
+                Attentra generates no positive savings, the optimization fee
+                is PKR 0.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <span className="text-4xl font-semibold tracking-[-0.055em] text-[var(--color-foreground)] sm:text-5xl">
+                {plan.priceDisplay}
+              </span>
+
+              {plan.period && (
+                <span className="pb-1 text-[10px] text-[var(--color-foreground-muted)]">
+                  {plan.period}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Features */}
@@ -398,6 +426,36 @@ function PricingCard({
         </a>
       </div>
     </motion.div>
+  );
+}
+
+/* ===============================================================
+   FORMULA STEP
+   =============================================================== */
+
+function FormulaStep({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <div className="font-mono text-[8px] tracking-[0.12em] text-[var(--color-accent)]">
+        {step}
+      </div>
+
+      <div className="mt-2 text-xs font-semibold text-[var(--color-foreground)]">
+        {title}
+      </div>
+
+      <p className="mt-1.5 text-[10px] leading-4 text-[var(--color-foreground-secondary)]">
+        {description}
+      </p>
+    </div>
   );
 }
 

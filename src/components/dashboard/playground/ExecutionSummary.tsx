@@ -9,16 +9,10 @@ import {
 
 import type { ExecutionDisplayData } from "@/types/dashboard";
 
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
+
 interface ExecutionSummaryProps {
   execution: ExecutionDisplayData;
-}
-
-function formatCost(value?: number) {
-  if (value === undefined) {
-    return "—";
-  }
-
-  return `$${value.toFixed(6)}`;
 }
 
 function formatLatency(value: number) {
@@ -52,7 +46,7 @@ export default function ExecutionSummary({
 
       <SummaryItem
         label="Actual cost"
-        value={formatCost(execution.actualCost)}
+        value={formatDisplayCurrency(execution.actualCost ?? 0)}
         icon={Coins}
       />
 

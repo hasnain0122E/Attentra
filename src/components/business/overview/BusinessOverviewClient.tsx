@@ -17,15 +17,7 @@ import BusinessIdentity from "@/components/business/overview/BusinessIdentity";
 
 import type { BusinessOverviewData } from "@/lib/dashboard/business-overview-queries";
 
-function formatCurrency(value: number): string {
-  if (value === 0) return "$0.0000";
-  const sign = value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-  if (abs < 0.0001) {
-    return `${sign}$${abs.toFixed(6)}`;
-  }
-  return `${sign}$${abs.toFixed(4)}`;
-}
+import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
 export default function BusinessOverviewClient() {
   const { business } = useBusiness();
@@ -82,7 +74,7 @@ export default function BusinessOverviewClient() {
       },
       {
         label: "Actual spend",
-        value: formatCurrency(metrics.actualSpend),
+        value: formatDisplayCurrency(metrics.actualSpend),
         detail: "total execution cost across workspace",
       },
       {

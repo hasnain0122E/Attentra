@@ -24,22 +24,7 @@ import {
   useBusiness,
 } from "@/components/business/BusinessContext";
 
-function formatCurrency(
-  value: number,
-): string {
-  if (value === 0) {
-    return "$0.0000";
-  }
-
-  const sign = value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-
-  if (abs < 0.0001) {
-    return `${sign}$${abs.toFixed(6)}`;
-  }
-
-  return `${sign}$${abs.toFixed(4)}`;
-}
+import { formatDisplayCurrency, formatDisplayCurrencyCompact } from "@/lib/currency/display-currency";
 
 function formatPercentage(
   value: number,
@@ -254,7 +239,7 @@ export default function BusinessCostIntelligence() {
           </div>
 
           <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-            {formatCurrency(
+            {formatDisplayCurrencyCompact(
               summary.actualSpend,
             )}
           </div>
@@ -277,7 +262,7 @@ export default function BusinessCostIntelligence() {
           </div>
 
           <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-            {formatCurrency(
+            {formatDisplayCurrencyCompact(
               summary.baselineSpend,
             )}
           </div>
@@ -309,8 +294,8 @@ export default function BusinessCostIntelligence() {
               />
             </div>
 
-            <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-              {formatCurrency(
+            <div className="mt-5 whitespace-nowrap font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
+              {formatDisplayCurrencyCompact(
                 summary.savings,
               )}
             </div>
@@ -350,7 +335,7 @@ export default function BusinessCostIntelligence() {
           </div>
 
           <div className="mt-1 text-[12px] font-medium text-[var(--color-foreground)]">
-            {formatCurrency(
+            {formatDisplayCurrencyCompact(
               summary.averageCostPerRequest,
             )}
           </div>

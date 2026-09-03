@@ -9,6 +9,8 @@ import type {
   ReactNode,
 } from "react";
 
+import { useState } from "react";
+
 import {
   ArrowUpRight,
   Buildings,
@@ -16,9 +18,12 @@ import {
   GearSix,
   GridFour,
   Key,
+  SignOut,
   Sparkle,
   X,
 } from "@phosphor-icons/react";
+
+import { signOut } from "next-auth/react";
 
 interface DashboardSidebarProps {
   mobileOpen: boolean;
@@ -62,6 +67,13 @@ export default function DashboardSidebar({
   onMobileClose,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    await signOut({ redirect: true, callbackUrl: "/login" });
+  }
 
   function isActive(
     href: string,
@@ -197,6 +209,21 @@ export default function DashboardSidebar({
               ),
             )}
           </div>
+
+          <div className="my-3 border-t border-[var(--color-border)]" />
+
+          <button
+            type="button"
+            disabled={signingOut}
+            onClick={handleSignOut}
+            className="group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-[11px] font-medium text-[var(--color-foreground-muted)] transition hover:bg-[var(--color-surface-soft)] hover:text-[var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-foreground-muted)] transition group-hover:text-[var(--color-foreground-secondary)]">
+              <SignOut size={15} weight="regular" />
+            </div>
+
+            <span>{signingOut ? "Signing out…" : "Sign out"}</span>
+          </button>
         </nav>
 
         {/* Business CTA */}

@@ -21,19 +21,7 @@ import {
   fetchConsumerCostAnalytics,
 } from "@/lib/dashboard/cost-intelligence-client";
 
-function formatCurrency(
-  value: number,
-): string {
-  if (value === 0) {
-    return "$0.0000";
-  }
-
-  if (Math.abs(value) < 0.0001) {
-    return `$${value.toFixed(6)}`;
-  }
-
-  return `$${value.toFixed(4)}`;
-}
+import { formatDisplayCurrency, formatDisplayCurrencyCompact } from "@/lib/currency/display-currency";
 
 function formatPercentage(
   value: number,
@@ -233,7 +221,7 @@ export default function CostIntelligence() {
           </div>
 
           <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-            {formatCurrency(
+            {formatDisplayCurrencyCompact(
               summary.actualSpend,
             )}
           </div>
@@ -257,7 +245,7 @@ export default function CostIntelligence() {
           </div>
 
           <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-            {formatCurrency(
+            {formatDisplayCurrencyCompact(
               summary.baselineSpend,
             )}
           </div>
@@ -302,8 +290,8 @@ export default function CostIntelligence() {
               )}
             </div>
 
-            <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-              {formatCurrency(
+            <div className="mt-5 whitespace-nowrap font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
+              {formatDisplayCurrencyCompact(
                 summary.savings,
               )}
             </div>
@@ -336,7 +324,7 @@ export default function CostIntelligence() {
           </div>
 
           <div className="mt-5 font-reservation text-[2rem] leading-none tracking-[-0.035em] text-[var(--color-foreground)]">
-            {formatCurrency(
+            {formatDisplayCurrencyCompact(
               summary.averageCostPerRequest,
             )}
           </div>
