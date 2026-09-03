@@ -1,216 +1,452 @@
 # Attentra
 
-**Intelligent model routing for AI cost optimization.**
+### Intelligent LLM routing for cost-efficient, transparent AI infrastructure
 
-Attentra sits between your application and multiple LLM providers (OpenAI, Anthropic, Google AI). Every request is analyzed, routed to the most cost-efficient capable model, executed with automatic fallback, and measured against a baseline so verified savings can be billed transparently.
+**Attentra analyzes every request, evaluates eligible models, routes it to the best-fit LLM, executes it through the provider, and records the decision, cost, latency, and savings — through one unified API.**
+
+[Live Demo](https://attentra-nine.vercel.app/) · [GitHub](https://github.com/hasnain0122E/Attentra)
 
 ---
 
-## The Problem
+## Why Attentra?
 
-Production AI applications overpay for intelligence. Teams pick one premium model for every request — including trivial ones — because evaluating model capability, context windows, and pricing across providers is manual work that never ends. Model catalogs change weekly.
+Modern AI products rarely have a single “best” model.
 
-## The Solution
+A simple classification request may not need an expensive frontier model, while a complex reasoning or coding task may require stronger capability. Using one model for every request can increase cost, reduce flexibility, and make AI spend difficult to understand.
 
-Attentra automates that decision per request:
+Attentra adds an intelligent routing layer between an application and multiple LLM providers.
 
-1. **Analyze** — detect task type and estimate token count / complexity
-2. **Route** — score every active model in the registry on capability, context fit, and projected cost
-3. **Execute** — call the selected provider adapter; on failure, fall through a provider-diverse fallback chain
-4. **Measure** — persist actual usage cost plus an equivalent-usage baseline cost for every request
-5. **Bill** — charge 10% of net verified savings per billing period; customers keep 90%
-
-Routing decisions are fully transparent: the API response and dashboards expose the selected model, task type, complexity, projected cost, routing score, candidate ranking, and a concise decision explanation.
-
-## Features
-
-- **Dynamic routing engine** — pure, deterministic scoring pipeline with task-affinity policies, context-window enforcement, and rejection tracking
-- **Three provider adapters** — OpenAI, Anthropic, Google AI, built on a common execution abstraction with normalized error codes
-- **Automatic fallback** — provider-diverse fallback ordering; a failing provider never dead-ends a request
-- **Cost intelligence** — per-request actual cost (real usage × executed model pricing) and baseline cost (same usage priced on the configured baseline model)
-- **Billing foundation** — period-level verified savings, 10% optimization fee on net positive savings, separate consumer and business ledgers
-- **Two workspaces** — consumer dashboard (playground, history, personal API keys, billing) and business workspace (organization requests, shared API keys, members, settings, billing)
-- **API keys** — personal or business scoped; raw key shown exactly once, only a SHA-256 hash is stored; revocation and expiry supported
-- **Live pricing intelligence** — model catalog discovery and pricing snapshots kept fresh by a scheduled sync
-- **Display currency** — USD internally; PKR presentation conversion (configurable)
-
-## Architecture Overview
-
-```
-Client / API
-  → validation (POST /api/v1/chat/completions)
-  → authentication (Auth.js session or Bearer API key)
-  → routing: analyze → candidates → score → persist RoutingDecision
-  → reliability gate: core persistence (Request + ownership) verified
-  → execution plan → ExecutionOrchestrator → provider adapter → fallback
-  → cost intelligence persistence
-  → normalized JSON response
+```text
+Application
+    │
+    ▼
+Attentra API
+    │
+    ├── Analyze request
+    ├── Estimate complexity
+    ├── Discover eligible models
+    ├── Score candidates
+    ├── Select best-fit model
+    ├── Execute with fallback support
+    └── Persist routing + cost telemetry
+    │
+    ▼
+OpenAI · Anthropic · Google
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the full request flow and module boundaries.
+Instead of asking developers to manually choose a model for every request, Attentra makes that decision dynamically.
 
-## Public API
+---
 
-### `POST /api/v1/chat/completions`
+## Core Features
 
-Authenticate with either an Auth.js session cookie or an API key:
+### Intelligent Model Routing
+Requests are analyzed by task type and complexity before eligible models are ranked using capability, projected cost, context fit, and routing criteria.
 
+### Multi-Provider Execution
+A provider-agnostic execution layer currently supports direct integrations with:
+
+- OpenAI
+- Anthropic
+- Google Gemini
+
+The underlying architecture remains extensible for additional providers.
+
+### Automatic Fallbacks
+If the primary execution fails with a retryable provider error, Attentra can continue through its fallback execution plan while preserving attempt telemetry.
+
+### Dynamic Model Registry & Pricing
+Attentra maintains model and pricing information in the database and uses current registry data during routing and cost calculations rather than hard-coding model selection into the application.
+
+### Cost Intelligence
+For successfully costed requests, Attentra can compare actual execution cost against a configured baseline model using the same token usage.
+
+This enables:
+
+- actual provider spend
+- baseline-equivalent spend
+- signed savings
+- savings percentage
+- comparable-request coverage
+- model-level spend analytics
+- time-based cost trends
+
+### Transparent Routing Decisions
+Attentra does not only return an answer. It exposes why and how the request was handled:
+
+- detected task
+- complexity
+- ranked candidates
+- selected model
+- routing score
+- projected cost
+- executed provider/model
+- attempts
+- token usage
+- latency
+- actual cost
+
+### Consumer Workspace
+Individual users get a production dashboard with:
+
+- Playground
+- Request history
+- Request detail and routing trace
+- Personal API keys
+- Cost intelligence
+- Billing analytics
+- Model activity
+- Routing health
+
+### Business Workspace
+Organizations receive a separately scoped workspace with:
+
+- business API keys
+- organization-level request analytics
+- member management
+- baseline model configuration
+- cost intelligence
+- billing analytics
+- routing health
+- request history
+
+---
+
+## Production Routing Flow
+
+```mermaid
+flowchart LR
+    A[Client Request] --> B[Authentication]
+    B --> C[Request Analyzer]
+    C --> D[Candidate Discovery]
+    D --> E[Routing Scorer]
+    E --> F[Execution Plan]
+    F --> G{Primary Provider}
+    G -->|Success| H[Normalize Response]
+    G -->|Retryable Failure| I[Fallback Model]
+    I --> H
+    H --> J[Usage & Cost Calculation]
+    J --> K[Persistence]
+    K --> L[Analytics / History / Billing]
 ```
-Authorization: Bearer atr_your_key_here
+
+The public API route remains thin: routing, provider execution, fallback behavior, normalization, and persistence are handled by dedicated backend layers.
+
+---
+
+## Live Production Example
+
+A production smoke test through the deployed Attentra Playground successfully processed:
+
+```text
+Prompt:
+Reply exactly: Attentra production works
 ```
 
-```json
-{
-  "messages": [
-    { "role": "user", "content": "Summarize this paragraph in one line." }
-  ],
-  "maxTokens": 256
-}
+Attentra:
+
+```text
+Task                 GENERAL
+Complexity           LOW
+Eligible candidates  49
+Routed model         Gemini 3.1 Flash Lite
+Executed provider    Google
+Execution attempts   1
+Input tokens         8
+Output tokens        4
+Total tokens         12
+Latency              ~3.93 s
+Response             Attentra production works
 ```
 
-Optional fields: `maxTokens` (positive integer ≤ 256000), `taskTypeHint`, `policy`, `requestId`.
+This verifies the deployed flow from authenticated Playground request → analysis → candidate ranking → routing → provider execution → telemetry → persistence.
 
-Success response (abridged):
+---
 
-```json
-{
-  "success": true,
-  "requestId": "req_...",
-  "content": "…",
-  "routing": {
-    "selectedModelId": "…",
-    "selectedModelIdentifier": "…",
-    "selectedModelDisplayName": "…",
-    "selectedProvider": "anthropic",
-    "reason": "Mock Model selected for a low-complexity general request based on capability, projected cost, and latency.",
-    "taskType": "GENERAL",
-    "complexity": "LOW",
-    "projectedCost": 0.001,
-    "candidates": [ { "rank": 1, "score": 0.87, "selected": true, "…": "…" } ]
-  },
-  "execution": {
-    "modelIdentifier": "…",
-    "provider": "anthropic",
-    "fallbackUsed": false,
-    "usage": { "inputTokens": 10, "outputTokens": 5, "totalTokens": 15 },
-    "latencyMs": 420,
-    "actualCost": 0.00042
-  }
-}
+## API
+
+Attentra exposes an OpenAI-style production endpoint:
+
+```http
+POST /api/v1/chat/completions
 ```
 
-Errors are normalized — `{ "success": false, "requestId", "error": { "code", "message", "retryable??" } }` — with stable codes mapped to HTTP status (`MISSING_API_KEY` 401, `RATE_LIMIT` 429, `TIMEOUT` 504, `NO_COMPATIBLE_MODELS` 400, `PERSISTENCE_FAILED` 500). Internal details are never exposed.
+Example:
 
-## Billing Model
-
-Per billing period (defaults to the current calendar month):
-
+```bash
+curl -X POST "https://attentra-nine.vercel.app/api/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer atr_your_api_key" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Explain vector databases in simple terms."
+      }
+    ]
+  }'
 ```
-verifiedSavings    = comparableBaselineCost − comparableActualCost   (net, period level)
-billableSavings    = max(verifiedSavings, 0)
-optimizationFee    = billableSavings × 0.10
-customerNetSavings = billableSavings − optimizationFee
-totalCustomerCost  = totalActualUsageCost + optimizationFee
+
+Attentra chooses the model automatically. Applications integrate with Attentra rather than hard-coding a provider/model decision for each request.
+
+> Never commit real Attentra or provider API keys to source control.
+
+---
+
+## Authentication & API-Key Security
+
+Attentra supports Google OAuth for the web application and scoped API keys for programmatic access.
+
+API keys follow a secure storage model:
+
+```text
+Raw key generated
+      ↓
+Shown to user once
+      ↓
+SHA-256 hash stored
+      ↓
+Raw key is never persisted
 ```
 
-- **Comparable requests** are successful requests with both actual and baseline cost. Non-comparable requests still count toward usage cost, and coverage (`comparable / total`) is reported honestly.
-- **Net, not summed**: negative-savings requests offset positive ones before the fee. A period of +100 +100 −150 yields a 5-unit fee, not 20.
-- **No double counting**: consumer billing covers requests with a user and no business (session or personal key); business billing covers everything scoped to the business, including API-key traffic with no user.
-- Negative verified savings are exposed as-is; the fee simply stays 0.
+Personal and business API keys have separate ownership semantics. Business membership and role authorization remain server-side.
 
-## Getting Started
+---
 
-### Prerequisites
+## Cost & Billing Model
 
-- Node.js 18+
-- PostgreSQL (any reachable instance — Neon works well)
-- Google OAuth credentials
-- At least one provider API key (OpenAI / Anthropic / Google AI)
+Attentra keeps provider usage and optimization economics separate.
 
-### Setup
+```text
+Baseline-equivalent cost
+        −
+Comparable actual provider cost
+        =
+Verified savings
+```
+
+For the production billing foundation:
+
+```text
+Billable savings = max(verified savings, 0)
+
+Attentra optimization fee = 10% × billable savings
+
+Customer retained savings = 90% × billable savings
+```
+
+Overspending comparable requests offset savings within the billing period before the optimization fee is calculated.
+
+All canonical calculations are performed in USD. The current product UI presents monetary values in PKR through a centralized display-currency layer.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 · React · TypeScript |
+| Styling | Tailwind CSS |
+| Motion / UI | Framer Motion · Phosphor Icons |
+| Authentication | Auth.js / NextAuth v5 · Google OAuth |
+| Database | PostgreSQL · Neon |
+| ORM | Prisma |
+| AI Providers | OpenAI · Anthropic · Google Gemini |
+| Validation / Testing | TypeScript · Vitest |
+| Deployment | Vercel |
+
+---
+
+## Architecture
+
+The backend is intentionally separated into focused layers.
+
+```text
+Client / SDK
+     │
+     ▼
+API + Authentication
+     │
+     ▼
+Request Analysis
+     │
+     ▼
+Model Registry
+     │
+     ▼
+Candidate Scoring
+     │
+     ▼
+Routing Decision
+     │
+     ▼
+Execution Orchestrator
+     │
+     ├──── OpenAI
+     ├──── Anthropic
+     └──── Google
+     │
+     ▼
+Normalized Result
+     │
+     ▼
+Cost Intelligence
+     │
+     ▼
+PostgreSQL
+     │
+     ├──── Consumer Dashboard
+     └──── Business Dashboard
+```
+
+The provider layer is abstracted so routing logic does not depend on provider-specific request/response formats.
+
+---
+
+## Request Ownership
+
+Attentra supports three request identities:
+
+| Request source | `userId` | `businessId` | `apiKeyId` |
+|---|---:|---:|---:|
+| Consumer session | ✓ | — | — |
+| Personal API key | ✓ | — | ✓ |
+| Business API key | — | ✓ | ✓ |
+
+This allows consumer analytics and business analytics to remain correctly isolated while using the same routing/execution infrastructure.
+
+---
+
+## Reliability & Persistence
+
+Attentra separates pre-execution persistence from post-execution telemetry.
+
+Before a paid provider call, core routing persistence must succeed. If the request or routing ownership cannot be persisted, execution is stopped.
+
+After provider execution, telemetry persistence is best-effort so a database logging issue does not incorrectly encourage a client to retry an already-paid provider request.
+
+This reduces the risk of duplicate paid LLM executions while keeping routing history auditable.
+
+---
+
+## Local Development
+
+### 1. Clone
+
+```bash
+git clone https://github.com/hasnain0122E/Attentra.git
+cd Attentra
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
-
-# 1. Configure environment
-cp .env.example .env      # then fill in values (see table below)
-
-# 2. Apply the database schema
-npx prisma migrate deploy
-
-# 3. Seed the model registry + providers (optional but recommended)
-npm run db:seed
-
-# 4. Run
-npm run dev               # http://localhost:3000
 ```
 
-### Environment Variables
+### 3. Configure environment
 
-All variables below are verified against actual source usage.
+Create `.env.local` from the repository's `.env.example` and configure your own credentials.
 
-| Variable | Scope | Required | Purpose |
-|---|---|---|---|
-| `DATABASE_URL` | server | yes | PostgreSQL connection string (Prisma) |
-| `AUTH_SECRET` | server | yes | JWT session encryption (Auth.js v5) |
-| `GOOGLE_CLIENT_ID` | server | yes | Google OAuth client |
-| `GOOGLE_CLIENT_SECRET` | server | yes | Google OAuth client |
-| `OPENAI_API_KEY` | server | yes* | OpenAI execution + catalog discovery |
-| `ANTHROPIC_API_KEY` | server | yes* | Anthropic execution + catalog discovery |
-| `GOOGLE_AI_API_KEY` | server | yes* | Google AI execution + catalog discovery |
-| `CRON_SECRET` | server | production | Protects `/api/internal/pricing-sync` |
-| `CONSUMER_BASELINE_MODEL` | server | yes | Baseline model identifier for verified savings |
-| `NEXT_PUBLIC_DISPLAY_CURRENCY` | public | no | Display currency (default `PKR`) |
-| `NEXT_PUBLIC_USD_TO_PKR_RATE` | public | no | Presentation conversion rate (default `277`) |
+Typical configuration includes:
 
-\* Required for live execution; the app runs without them but cannot execute requests on that provider.
+```env
+DATABASE_URL=
+AUTH_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 
-Never set `RUN_LIVE_PROVIDER_TESTS` in production — it is a local test gate that enables real provider calls in E2E tests.
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GOOGLE_AI_API_KEY=
 
-### Scripts
+CRON_SECRET=
+CONSUMER_BASELINE_MODEL=
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Development server |
-| `npm run build` / `npm start` | Production build / serve |
-| `npm test` | Full Vitest suite (non-live by default) |
-| `npm run db:seed` | Seed providers + model registry |
-| `npm run pricing:sync` | Manual pricing sync |
-| `npm run catalog:sync` | Manual catalog discovery |
+NEXT_PUBLIC_DISPLAY_CURRENCY=
+NEXT_PUBLIC_USD_TO_PKR_RATE=
+```
 
-## Testing
+Do **not** enable live-provider tests unless you intentionally want tests to make real provider calls.
+
+### 4. Prisma
 
 ```bash
-npx vitest run          # full suite — unit, API, routing, execution, billing
+npx prisma generate
 ```
 
-The suite is deterministic and makes **no provider calls** by default; providers are exercised through mocked adapters. A separate live E2E suite (`src/__tests__/e2e/`) runs only when `RUN_LIVE_PROVIDER_TESTS=true` and real credentials are present.
+Apply the database workflow appropriate to your environment before starting the application.
 
-## Deployment (Vercel)
+### 5. Start development
 
-1. Push the repository to GitHub and import it in Vercel (framework auto-detected: Next.js).
-2. Add all environment variables from the table above as Production/Preview env vars (server-only values stay server-side; `NEXT_PUBLIC_*` are required at build time).
-3. Attach a PostgreSQL database and set `DATABASE_URL`; run `npx prisma migrate deploy` against it once.
-4. Deploy. `vercel.json` registers the pricing-sync cron (`0 */10 * * *`, every 10 hours) which calls `GET /api/internal/pricing-sync` with `Authorization: Bearer CRON_SECRET`.
-5. Add the production OAuth redirect URI (`https://your-domain/api/auth/callback/google`) in Google Cloud Console.
+```bash
+npm run dev
+```
 
-## Security Notes
+Open:
 
-- API keys are stored **only** as SHA-256 hashes; the raw key is displayed once at creation and never retrievable.
-- Business API-key requests are attributed to the organization (`userId = null`, `businessId` set); personal keys and sessions are attributed to the user (`businessId = null`).
-- Provider API keys are server-side only and never shipped to the client.
-- Error responses are sanitized (structured codes, no stack traces or SDK messages with credentials).
-- `.env` / `.env.local` are git-ignored.
+```text
+http://localhost:3000
+```
 
-## Known Limitations (MVP)
+---
 
-- Authentication is Google OAuth only; the login page's email/password fields are decorative.
-- No payment processing, invoices, or subscription management — billing is calculated and displayed, not charged.
-- Billing periods are query-driven; there is no invoice archive.
-- There is no per-business Models/Routing analytics or management surface; model-level insight is available per request in history, and the registry itself is engine-owned.
-- Business settings are organization-identity only (name/slug); routing defaults are engine policies, not per-business configuration.
-- No usage rate limiting per key beyond provider-level errors.
+## Validation
 
-## License
+The current deployment-ready codebase has been validated with:
 
-Private project — all rights reserved.
+```text
+Full test suite    952 passed / 4 skipped
+TypeScript         0 errors
+Production build   Successful
+```
+
+Live-provider tests are explicitly gated to avoid accidental API-credit consumption.
+
+---
+
+## Deployment
+
+Attentra is currently deployed on Vercel:
+
+**https://attentra-nine.vercel.app/**
+
+The production deployment uses:
+
+- Vercel serverless functions
+- Edge-safe authentication middleware
+- Neon PostgreSQL
+- Google OAuth
+- direct provider API integrations
+- scheduled pricing synchronization
+
+The middleware authentication configuration is separated from Prisma-backed server authentication so Node-only database dependencies are not bundled into the Vercel Edge middleware.
+
+---
+
+## Project Status
+
+Attentra is an active engineering project and hackathon build.
+
+Current implemented foundation:
+
+**Routing engine → provider execution → fallback orchestration → dynamic model registry → pricing intelligence → persistence → consumer workspace → business workspace → API keys → cost intelligence → billing analytics → production deployment**
+
+Future work can extend the platform with richer routing evaluation, additional provider integrations, production observability, SDKs, configurable policies, and commercial billing infrastructure.
+
+---
+
+## Built By
+
+**Hasnain Ali**
+
+Software Engineering student and AI/ML engineer focused on building practical AI systems and developer infrastructure.
+
+[GitHub](https://github.com/hasnain0122E) · [LinkedIn](https://www.linkedin.com/in/hasnainali7867/)
+
+---
+
+<p align="center">
+  <strong>Attentra</strong><br/>
+  Route intelligently. Understand every decision. Optimize AI spend.
+</p>
