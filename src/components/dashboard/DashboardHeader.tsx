@@ -16,6 +16,7 @@ const pageNames: Record<string, string> = {
   "/dashboard/playground": "Playground",
   "/dashboard/history": "History",
   "/dashboard/api-keys": "API keys",
+  "/billing": "Billing",
   "/dashboard/settings": "Settings",
 };
 

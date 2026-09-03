@@ -20,6 +20,7 @@ const pageNames: Record<string, string> = {
   "/business/models": "Models",
   "/business/members": "Members",
   "/business/api-keys": "API keys",
+  "/business/billing": "Billing",
   "/business/settings": "Settings",
 };
 

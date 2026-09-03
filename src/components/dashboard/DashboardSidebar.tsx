@@ -18,6 +18,7 @@ import {
   GearSix,
   GridFour,
   Key,
+  Receipt,
   SignOut,
   Sparkle,
   X,
@@ -51,6 +52,11 @@ const workspaceNavigation = [
     label: "API keys",
     href: "/dashboard/api-keys",
     icon: Key,
+  },
+  {
+    label: "Billing",
+    href: "/billing",
+    icon: Receipt,
   },
 ];
 

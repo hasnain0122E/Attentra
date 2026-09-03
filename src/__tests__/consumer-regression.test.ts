@@ -295,3 +295,60 @@ describe("Dead mock data cleanup", () => {
     expect(content).not.toContain("req_01J8V");
   });
 });
+
+// ─────────────────────────────────────────────────────
+// 7. BILLING PAGE (Phase 12.15)
+// ─────────────────────────────────────────────────────
+
+describe("Consumer billing page", () => {
+  it("billing page exists in consumer route group", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/app/(dashboard)/billing/page.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain("BillingClient");
+  });
+
+  it("consumer sidebar includes Billing link", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/dashboard/DashboardSidebar.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain('label: "Billing"');
+    expect(content).toContain('href: "/billing"');
+  });
+
+  it("consumer header maps billing route", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/dashboard/DashboardHeader.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain('"/billing": "Billing"');
+  });
+
+  it("billing client does not contain hardcoded Acme AI", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/dashboard/billing/BillingClient.tsx",
+      "utf-8",
+    );
+
+    expect(content).not.toContain("Acme AI");
+  });
+
+  it("billing client uses display currency formatter", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/dashboard/billing/BillingClient.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain("formatDisplayCurrency");
+  });
+});

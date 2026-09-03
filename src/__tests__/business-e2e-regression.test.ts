@@ -422,3 +422,83 @@ describe("Consumer request queries still work after extraction", () => {
     expect(content).not.toContain("function parseCandidateModels");
   });
 });
+
+// ─────────────────────────────────────────────────────
+// 11. BUSINESS BILLING PAGE (Phase 12.15)
+// ─────────────────────────────────────────────────────
+
+describe("Business billing page", () => {
+  it("billing page exists in business route group", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/app/(business)/business/billing/page.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain("BusinessBillingClient");
+  });
+
+  it("business sidebar includes Billing link", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/business/BusinessSidebar.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain('label: "Billing"');
+    expect(content).toContain('href: "/business/billing"');
+  });
+
+  it("business header maps billing route", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/business/BusinessHeader.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain('"/business/billing": "Billing"');
+  });
+
+  it("business billing client does not contain hardcoded Acme AI", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/business/billing/BusinessBillingClient.tsx",
+      "utf-8",
+    );
+
+    expect(content).not.toContain("Acme AI");
+  });
+
+  it("business billing client uses real business context", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/business/billing/BusinessBillingClient.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain("useBusiness");
+    expect(content).toContain("business.id");
+  });
+
+  it("business billing client links to Settings when no baseline", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/components/business/billing/BusinessBillingClient.tsx",
+      "utf-8",
+    );
+
+    expect(content).toContain("/business/settings");
+    expect(content).toContain("Configure a baseline model");
+  });
+
+  it("billing API route exists for business", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      "src/app/api/business/[businessId]/billing/route.ts",
+      "utf-8",
+    );
+
+    expect(content).toContain("requireBusinessMembership");
+    expect(content).toContain("getBusinessBilling");
+  });
+});

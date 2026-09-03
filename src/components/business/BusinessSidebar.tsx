@@ -17,6 +17,7 @@ import {
   GearSix,
   GridFour,
   Key,
+  Receipt,
   SignOut,
   UsersThree,
   X,
@@ -52,6 +53,11 @@ const organizationNavigation = [
     label: "API keys",
     href: "/business/api-keys",
     icon: Key,
+  },
+  {
+    label: "Billing",
+    href: "/business/billing",
+    icon: Receipt,
   },
 ];
 
