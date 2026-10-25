@@ -14,7 +14,9 @@
     "catalog:sync": "tsx scripts/catalog-sync.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@auth/prisma-adapter": "^2.11.3",
+    "@google/generative-ai": "^0.24.0",
     "@phosphor-icons/react": "^2.1.10",
     "@prisma/client": "^6.19.3",
     "clsx": "^2.1.1",
@@ -22,12 +24,11 @@
     "motion": "^13.1.0",
     "next": "^14.2.35",
     "next-auth": "^5.0.0-beta.32",
+    "openai": "^4.85.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.6.1",
-    "@google/generative-ai": "^0.24.0",
-    "openai": "^4.85.0",
-    "@anthropic-ai/sdk": "^0.39.0"
+    "sharp": "^0.35.5",
+    "tailwind-merge": "^2.6.1"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -37,9 +38,9 @@
     "postcss": "^8",
     "prisma": "^6.19.3",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.19.0",
     "typescript": "^5",
-    "vitest": "^4.0.0",
-    "tsx": "^4.19.0"
+    "vitest": "^4.0.0"
   },
   "allowScripts": {
     "prisma@6.19.3": true,
