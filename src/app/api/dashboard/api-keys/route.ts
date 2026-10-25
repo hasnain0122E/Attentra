@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth } from "@/lib/auth-utils";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   createPersonalApiKey,
@@ -27,9 +27,21 @@ export const dynamic = "force-dynamic";
 // ─────────────────────────────────────────────────────
 
 export async function GET() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      },
+      { status: 401 },
+    );
+  }
+
+  const userId = session.user.id;
+
   try {
-    const session = await requireAuth();
-    const userId = session.user.id;
 
     const keys = await listPersonalApiKeys(prisma, userId);
 
@@ -66,9 +78,21 @@ export async function GET() {
 // ─────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      },
+      { status: 401 },
+    );
+  }
+
+  const userId = session.user.id;
+
   try {
-    const session = await requireAuth();
-    const userId = session.user.id;
 
     let body: Record<string, unknown>;
 

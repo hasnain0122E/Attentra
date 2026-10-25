@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth } from "@/lib/auth-utils";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revokePersonalApiKey } from "@/lib/api-keys";
 
@@ -31,9 +31,21 @@ export async function DELETE(
   _request: NextRequest,
   context: RouteContext,
 ) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      },
+      { status: 401 },
+    );
+  }
+
+  const userId = session.user.id;
+
   try {
-    const session = await requireAuth();
-    const userId = session.user.id;
     const apiKeyId = context.params.apiKeyId;
 
     if (!apiKeyId?.trim()) {

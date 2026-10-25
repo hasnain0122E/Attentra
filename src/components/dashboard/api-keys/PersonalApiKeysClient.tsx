@@ -190,6 +190,39 @@ export default function PersonalApiKeysClient() {
     }
   }, [modalState, fetchKeys]);
 
+  // ── Modals ────────────────────────────────────────
+  // Rendered by both the empty state and the full view so the first
+  // key can be created from the empty state.
+  const modals = (
+    <>
+      {modalState.type === "create" && (
+        <CreateKeyModal
+          onClose={() => setModalState({ type: "closed" })}
+          onCreated={(rawKey, keyName) => {
+            setModalState({ type: "created", rawKey, keyName });
+            void fetchKeys();
+          }}
+        />
+      )}
+
+      {modalState.type === "created" && (
+        <CreatedKeyModal
+          rawKey={modalState.rawKey}
+          keyName={modalState.keyName}
+          onClose={() => setModalState({ type: "closed" })}
+        />
+      )}
+
+      {modalState.type === "revoke" && (
+        <RevokeModal
+          keyName={modalState.keyName}
+          onClose={() => setModalState({ type: "closed" })}
+          onConfirm={confirmRevoke}
+        />
+      )}
+    </>
+  );
+
   // ── Loading ───────────────────────────────────────
   if (loading) {
     return (
@@ -287,6 +320,8 @@ export default function PersonalApiKeysClient() {
           {/* Billing notice */}
           <BillingNotice />
         </div>
+
+        {modals}
       </>
     );
   }
@@ -548,31 +583,7 @@ export default function PersonalApiKeysClient() {
         <BillingNotice />
       </div>
 
-      {modalState.type === "create" && (
-        <CreateKeyModal
-          onClose={() => setModalState({ type: "closed" })}
-          onCreated={(rawKey, keyName) => {
-            setModalState({ type: "created", rawKey, keyName });
-            void fetchKeys();
-          }}
-        />
-      )}
-
-      {modalState.type === "created" && (
-        <CreatedKeyModal
-          rawKey={modalState.rawKey}
-          keyName={modalState.keyName}
-          onClose={() => setModalState({ type: "closed" })}
-        />
-      )}
-
-      {modalState.type === "revoke" && (
-        <RevokeModal
-          keyName={modalState.keyName}
-          onClose={() => setModalState({ type: "closed" })}
-          onConfirm={confirmRevoke}
-        />
-      )}
+      {modals}
     </>
   );
 }
