@@ -254,7 +254,7 @@ export function normalizeAnyError(
  * Sanitize an error message to prevent secret leakage.
  *
  * Strips patterns that commonly contain:
- * - API keys (sk-...)
+ * - API keys (sk-..., incl. sk-ant-/sk-proj-; Google AIza...; Attentra atr_...)
  * - Bearer tokens
  * - Authorization headers
  * - Key=value credential pairs
@@ -263,11 +263,105 @@ export function sanitizeErrorMessage(message: string): string {
   if (!message) return "Unknown error";
 
   return message
-    .replace(/sk-[a-zA-Z0-9]{20,}/g, "[REDACTED]")
+    .replace(/sk-[a-zA-Z0-9_-]{20,}/g, "[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_-]{30,}/g, "[REDACTED]")
+    .replace(/atr_[0-9a-f]{16,}/gi, "[REDACTED]")
     .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
     .replace(/key[=:]\s*\S+/gi, "key=[REDACTED]")
     .replace(/token[=:]\s*\S+/gi, "token=[REDACTED]")
     .replace(/authorization[=:]\s*\S+/gi, "authorization=[REDACTED]")
     .replace(/secret[=:]\s*\S+/gi, "secret=[REDACTED]")
     .replace(/password[=:]\s*\S+/gi, "password=[REDACTED]");
+}
+
+// ─────────────────────────────────────────────────────
+// ATTEMPT FAILURE CLASSIFICATION (diagnostics only)
+// ─────────────────────────────────────────────────────
+
+/**
+ * Diagnostic category for a failed provider attempt.
+ *
+ * Finer-grained than ExecutionErrorCode so logs distinguish, e.g., a
+ * model retired for the provider account from a transient rate limit.
+ * Used for logging only — fallback decisions still use the error code.
+ */
+export type AttemptFailureCategory =
+  | "model_unavailable_for_account"
+  | "model_not_found"
+  | "quota_exhausted"
+  | "rate_limited"
+  | "permission_denied"
+  | "auth_failed"
+  | "timeout"
+  | "provider_unavailable"
+  | "network"
+  | "invalid_request"
+  | "context_length"
+  | "other";
+
+/**
+ * Classify a failed attempt from its normalized code and provider message.
+ * Provider-neutral: matches common wording, never provider names.
+ */
+export function classifyAttemptFailure(
+  code: string,
+  message: string
+): AttemptFailureCategory {
+  const m = message.toLowerCase();
+
+  switch (code) {
+    case "MODEL_UNAVAILABLE":
+      return /no longer available|not available to|not have access|does not have access|deprecat|retired/.test(m)
+        ? "model_unavailable_for_account"
+        : "model_not_found";
+    case "RATE_LIMIT":
+      return /quota|resource_exhausted|limit:\s*0|billing|insufficient/.test(m)
+        ? "quota_exhausted"
+        : "rate_limited";
+    case "AUTHENTICATION":
+    case "MISSING_API_KEY":
+      return /permission|forbidden|403|not authorized|not allowed/.test(m)
+        ? "permission_denied"
+        : "auth_failed";
+    case "TIMEOUT":
+    case "REQUEST_TIMEOUT":
+      return "timeout";
+    case "SERVER_ERROR":
+      return "provider_unavailable";
+    case "NETWORK_ERROR":
+      return "network";
+    case "INVALID_REQUEST":
+      return "invalid_request";
+    case "CONTEXT_LENGTH":
+      return "context_length";
+    default:
+      return "other";
+  }
+}
+
+/** Minimum length of message text treated as prompt content for redaction. */
+const PROMPT_REDACTION_MIN_LENGTH = 12;
+
+/**
+ * Remove request message content that a provider may echo in an error
+ * (best effort: whole messages and individual lines ≥ 12 characters).
+ */
+export function redactPromptContent(
+  text: string,
+  messages: Array<{ content: string }>
+): string {
+  let out = text;
+
+  for (const { content } of messages) {
+    const fragments = [content, ...content.split(/\r?\n/)]
+      .map((f) => f.trim())
+      .filter((f) => f.length >= PROMPT_REDACTION_MIN_LENGTH)
+      .sort((a, b) => b.length - a.length);
+
+    for (const fragment of fragments) {
+      out = out.split(fragment).join("[PROMPT]");
+    }
+  }
+
+  return out;
 }

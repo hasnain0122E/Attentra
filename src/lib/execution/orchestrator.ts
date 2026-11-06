@@ -51,7 +51,11 @@ import { validateExecutionPlan } from "@/lib/routing/execution-plan";
 import type { ExecutionOptions } from "./types";
 import { ProviderRegistry, createDefaultProviderRegistry } from "./provider-registry";
 import { Dispatcher } from "./dispatcher";
-import { sanitizeErrorMessage } from "./errors";
+import {
+  classifyAttemptFailure,
+  redactPromptContent,
+  sanitizeErrorMessage,
+} from "./errors";
 import type { PrismaClient } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────
@@ -60,6 +64,33 @@ import type { PrismaClient } from "@prisma/client";
 
 /** Hard upper bound on total execution attempts (primary + fallbacks). */
 export const MAX_ORCHESTRATOR_ATTEMPTS = 5;
+
+/** Provider error text kept in attempt-failure logs. */
+const MAX_LOGGED_MESSAGE_LENGTH = 200;
+
+/**
+ * Structured, secret-free log line for one failed provider attempt.
+ *
+ * Emitted as JSON for log search (Vercel → Logs: "[orchestrator] attempt failed").
+ * Contains no prompt, response, API key, Authorization header or
+ * connection string: the provider message is sanitized, prompt-redacted
+ * and truncated by the caller.
+ */
+function logAttemptFailure(entry: {
+  requestId?: string;
+  attempt: number;
+  maxAttempts: number;
+  provider: string;
+  model: string;
+  code: string;
+  category: string;
+  retryable: boolean;
+  willFallback: boolean;
+  latencyMs: number;
+  message: string;
+}): void {
+  console.warn("[orchestrator] attempt failed", JSON.stringify(entry));
+}
 
 // ─────────────────────────────────────────────────────
 // EXECUTION ATTEMPT
@@ -323,6 +354,28 @@ export class ExecutionOrchestrator {
 
       attempts.push(attempt);
       lastResult = result;
+
+      if (!result.success && result.error) {
+        const fallsThrough =
+          result.error.retryable || result.error.code === "MODEL_UNAVAILABLE";
+
+        logAttemptFailure({
+          requestId: plan.requestId,
+          attempt: i + 1,
+          maxAttempts,
+          provider: target.providerId,
+          model: target.modelIdentifier,
+          code: result.error.code,
+          category: classifyAttemptFailure(result.error.code, result.error.message),
+          retryable: result.error.retryable,
+          willFallback: fallsThrough && i + 1 < Math.min(maxAttempts, targets.length),
+          latencyMs,
+          message: redactPromptContent(
+            sanitizeErrorMessage(result.error.message),
+            messages
+          ).slice(0, MAX_LOGGED_MESSAGE_LENGTH),
+        });
+      }
 
       // 5a. Success — stop immediately
       if (result.success) {

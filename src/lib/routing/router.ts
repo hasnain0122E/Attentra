@@ -240,7 +240,14 @@ export async function routeWithDatabase(
       };
     }
 
-    if (loadResult.candidates.length === 0) {
+    // Operator exclusions (ROUTING_EXCLUDED_MODELS) apply to both automatic
+    // and explicit selection; unset → no change.
+    const candidates = applyRoutingExclusions(
+      loadResult.candidates,
+      parseRoutingExclusions(process.env.ROUTING_EXCLUDED_MODELS)
+    );
+
+    if (candidates.length === 0) {
       return {
         success: false,
         error: "No active models with current pricing available in database",
@@ -250,7 +257,7 @@ export async function routeWithDatabase(
 
     // 2. Explicit model: restrict routing to that registry model
     if (options?.model) {
-      const resolved = resolveExplicitModel(loadResult.candidates, options.model);
+      const resolved = resolveExplicitModel(candidates, options.model);
 
       if (!resolved.candidate) {
         return {
@@ -281,7 +288,7 @@ export async function routeWithDatabase(
     // 3. Run pure routing pipeline
     return executeRoutingPipeline(
       request,
-      loadResult.candidates,
+      candidates,
       options?.policy
     );
   } catch (error) {
@@ -343,6 +350,46 @@ export async function routeAndPersist(
 // ─────────────────────────────────────────────────────
 // INTERNAL HELPERS
 // ─────────────────────────────────────────────────────
+
+/**
+ * Parse ROUTING_EXCLUDED_MODELS: comma-separated "<provider>/<modelIdentifier>"
+ * or bare "<modelIdentifier>" entries (whitespace ignored, provider
+ * case-insensitive).
+ *
+ * Intended for models confirmed inaccessible to the configured provider
+ * account (e.g. retired for new projects) that provider listings still
+ * report — catalog/pricing sync would re-activate a database flag.
+ */
+export function parseRoutingExclusions(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * Remove excluded models from the routable candidate pool.
+ */
+export function applyRoutingExclusions(
+  candidates: ModelCandidate[],
+  exclusions: string[]
+): ModelCandidate[] {
+  if (exclusions.length === 0) return candidates;
+
+  return candidates.filter((c) => {
+    const provider = (c.providerName ?? c.providerId).toLowerCase();
+
+    return !exclusions.some((entry) => {
+      const slash = entry.indexOf("/");
+      if (slash === -1) return entry === c.modelIdentifier;
+
+      return (
+        entry.slice(0, slash).toLowerCase() === provider &&
+        entry.slice(slash + 1) === c.modelIdentifier
+      );
+    });
+  });
+}
 
 /**
  * Resolve an explicitly requested model against routable candidates
