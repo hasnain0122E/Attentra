@@ -225,7 +225,8 @@ export class OpenAIProvider implements AIProvider {
     const startTime = Date.now();
 
     try {
-      const maxTokensParam = usesCompletionTokensParam(modelId)
+      const isReasoningModel = usesCompletionTokensParam(modelId);
+      const maxTokensParam = isReasoningModel
         ? { max_completion_tokens: request.maxTokens }
         : { max_tokens: request.maxTokens };
 
@@ -233,7 +234,9 @@ export class OpenAIProvider implements AIProvider {
         model: modelId,
         messages: toOpenAIMessages(request.messages),
         ...maxTokensParam,
-        temperature: request.temperature,
+        // Reasoning models accept only the default temperature; sending
+        // another value fails the request, so it is not forwarded to them.
+        ...(!isReasoningModel && { temperature: request.temperature }),
       });
 
       const latencyMs = Date.now() - startTime;

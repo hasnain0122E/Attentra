@@ -37,6 +37,14 @@ export interface CandidateFilterOptions {
 
   /** Whether pricing is required for a candidate to be eligible */
   requirePricing?: boolean;
+
+  /**
+   * Skip the task-capability filter (default: false).
+   * Used when the client explicitly requested a model: the client's
+   * choice overrides heuristic task detection. Context and pricing
+   * checks still apply.
+   */
+  ignoreCapabilities?: boolean;
 }
 
 /**
@@ -84,7 +92,7 @@ export function filterCandidates(
     }
 
     // 2. Capability filter
-    if (requiredCapabilities.length > 0) {
+    if (requiredCapabilities.length > 0 && !options.ignoreCapabilities) {
       const hasCapability = requiredCapabilities.some((cap) =>
         model.capabilities.includes(cap)
       );

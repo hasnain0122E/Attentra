@@ -25,7 +25,7 @@ import type {
   ExecutionPlan,
   ExecutionResult,
 } from "@/lib/routing/execution-plan";
-import type { ExecutionRequest, ExecutionConfig } from "./types";
+import type { ExecutionRequest, ExecutionConfig, SamplingParams } from "./types";
 import { DEFAULT_EXECUTION_TIMEOUT_MS } from "./types";
 import { ExecutionAdapterRegistry } from "./registry";
 import { Executor } from "./executor";
@@ -63,12 +63,14 @@ export class Dispatcher {
    * @param plan     Validated execution plan from prepareExecutionFlow()
    * @param messages Conversation messages to send to the provider
    * @param config   Optional per-request execution config override
+   * @param params   Optional client sampling parameters (temperature)
    * @returns        Normalized execution result
    */
   async executePlan(
     plan: ExecutionPlan,
     messages: Array<{ role: string; content: string }>,
-    config?: ExecutionConfig
+    config?: ExecutionConfig,
+    params?: SamplingParams
   ): Promise<ExecutionResult> {
     const startTime = Date.now();
 
@@ -138,7 +140,7 @@ export class Dispatcher {
     }
 
     // 4. Build ExecutionRequest from ExecutionPlan
-    const request = buildExecutionRequest(plan, messages);
+    const request = buildExecutionRequest(plan, messages, params);
 
     // 5. Execute through the resolved adapter (forward the primary target
     //    as ExecutionPlan context for the provider contract)
@@ -192,7 +194,8 @@ export async function executeExecutionPlan(
  */
 function buildExecutionRequest(
   plan: ExecutionPlan,
-  messages: Array<{ role: string; content: string }>
+  messages: Array<{ role: string; content: string }>,
+  params?: SamplingParams
 ): ExecutionRequest {
   return {
     modelId: plan.primary.modelId,
@@ -200,6 +203,7 @@ function buildExecutionRequest(
     modelIdentifier: plan.primary.modelIdentifier,
     messages,
     maxTokens: plan.estimatedOutputTokens || undefined,
+    temperature: params?.temperature,
     estimatedInputTokens: plan.estimatedInputTokens,
     estimatedOutputTokens: plan.estimatedOutputTokens,
     requestId: plan.requestId ?? generateRequestId(),

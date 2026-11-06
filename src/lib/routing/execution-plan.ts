@@ -211,6 +211,12 @@ export interface ExecutionResult {
   /** Response content from the provider (text, JSON, etc.) */
   content?: string;
 
+  /**
+   * Provider-native finish/stop reason (e.g. "stop", "end_turn", "MAX_TOKENS").
+   * Undefined when the provider did not report one.
+   */
+  finishReason?: string;
+
   /** Actual token usage reported by the provider */
   usage?: {
     inputTokens: number;

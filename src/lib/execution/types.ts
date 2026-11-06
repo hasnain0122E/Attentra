@@ -87,6 +87,15 @@ export interface ExecutionConfig {
   timeoutMs?: number;
 }
 
+/**
+ * Client-supplied sampling parameters forwarded to the provider request.
+ * Kept separate from ExecutionConfig, which controls the execution boundary.
+ */
+export interface SamplingParams {
+  /** Sampling temperature (0.0–2.0) */
+  temperature?: number;
+}
+
 /** Default execution timeout: 30 seconds */
 export const DEFAULT_EXECUTION_TIMEOUT_MS = 30_000;
 
@@ -249,6 +258,11 @@ export class BaseExecutionAdapter implements ProviderAdapter {
         modelId: request.modelId,
         providerRequestId: response.id,
         content: response.content,
+        // Adapters report "unknown" when the provider gave no reason.
+        finishReason:
+          response.finishReason && response.finishReason !== "unknown"
+            ? response.finishReason
+            : undefined,
         usage: {
           inputTokens: response.usage.inputTokens,
           outputTokens: response.usage.outputTokens,

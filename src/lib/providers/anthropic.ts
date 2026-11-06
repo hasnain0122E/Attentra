@@ -209,7 +209,10 @@ export class AnthropicProvider implements AIProvider {
         max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
         messages,
         ...(system && { system }),
-        ...(request.temperature !== undefined && { temperature: request.temperature }),
+        // Anthropic accepts 0–1; the OpenAI-compatible API accepts 0–2.
+        ...(request.temperature !== undefined && {
+          temperature: Math.min(request.temperature, 1),
+        }),
       });
 
       const latencyMs = Date.now() - startTime;

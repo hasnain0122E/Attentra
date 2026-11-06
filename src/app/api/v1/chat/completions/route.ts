@@ -132,7 +132,12 @@ function errorToHttpStatus(code: string): number {
 
     case "INVALID_REQUEST":
     case "INVALID_RESPONSE":
+    case "CONTEXT_LENGTH":
+    case "AMBIGUOUS_MODEL":
       return 400;
+
+    case "MODEL_NOT_FOUND":
+      return 404;
 
     case "NO_ACTIVE_MODELS":
     case "NO_COMPATIBLE_MODELS":
@@ -152,7 +157,59 @@ function errorToHttpStatus(code: string): number {
 }
 
 /**
+ * Map a provider-native finish reason to the OpenAI vocabulary.
+ *
+ * OpenAI: stop/length/content_filter/tool_calls (passed through).
+ * Anthropic: end_turn/stop_sequence → stop, max_tokens → length,
+ *   refusal → content_filter, tool_use → tool_calls.
+ * Google: STOP → stop, MAX_TOKENS → length,
+ *   SAFETY/RECITATION/BLOCKLIST/PROHIBITED_CONTENT/SPII → content_filter.
+ * Missing or unrecognised reasons map to "stop".
+ */
+function toOpenAIFinishReason(
+  raw: string | undefined,
+): "stop" | "length" | "content_filter" | "tool_calls" {
+  switch ((raw ?? "").toLowerCase()) {
+    case "length":
+    case "max_tokens":
+      return "length";
+
+    case "content_filter":
+    case "refusal":
+    case "safety":
+    case "recitation":
+    case "blocklist":
+    case "prohibited_content":
+    case "spii":
+    case "image_safety":
+      return "content_filter";
+
+    case "tool_calls":
+    case "tool_use":
+    case "function_call":
+      return "tool_calls";
+
+    default:
+      return "stop";
+  }
+}
+
+/** OpenAI error `type` for an HTTP status. */
+function openAIErrorType(status: number): string {
+  if (status === 401) return "authentication_error";
+  if (status === 403) return "permission_error";
+  if (status === 429) return "rate_limit_error";
+  if (status >= 500) return "server_error";
+  return "invalid_request_error";
+}
+
+/**
  * Build a normalized success response.
+ *
+ * The body is an OpenAI-compatible chat completion (id, object, created,
+ * model, choices, usage) with Attentra's original fields kept alongside
+ * for existing consumers (Playground, scripts): success, requestId,
+ * content, routing, execution, timestamp.
  *
  * Includes routing transparency fields sourced directly
  * from the ExecutionPlan.
@@ -166,10 +223,16 @@ function buildSuccessResponse(
   result: OrchestratorResult,
   plan: ExecutionPlan,
   routingDecision?: RoutingDecisionType,
+  explicitModel = false,
 ) {
   const successfulAttempt = result.executionAttempts.find(
     (attempt) => attempt.success,
   );
+
+  const executedModelIdentifier =
+    successfulAttempt?.modelIdentifier ?? plan.primary.modelIdentifier;
+  const createdMs = Date.parse(result.timestamp ?? "");
+  const content = result.content ?? "";
 
   // ── Map routing candidates for playground / history ──
   const candidates = (routingDecision?.candidates ?? []).map(
@@ -185,24 +248,57 @@ function buildSuccessResponse(
   );
 
   return {
+    // ── OpenAI chat.completion envelope ──────────────
+    id: requestId,
+    object: "chat.completion" as const,
+    created: Math.floor(
+      (Number.isNaN(createdMs) ? Date.now() : createdMs) / 1000,
+    ),
+    model: executedModelIdentifier,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant" as const,
+          content,
+          refusal: null,
+        },
+        logprobs: null,
+        finish_reason: toOpenAIFinishReason(result.finishReason),
+      },
+    ],
+    // Provider-reported counts only; omitted when the provider gave none.
+    ...(result.usage && {
+      usage: {
+        prompt_tokens: result.usage.inputTokens,
+        completion_tokens: result.usage.outputTokens,
+        total_tokens: result.usage.totalTokens,
+      },
+    }),
+    system_fingerprint: null,
+
+    // ── Attentra fields (kept for existing consumers) ─
     success: true as const,
     requestId,
 
-    content: result.content ?? "",
+    content,
 
     routing: {
       selectedModelId: plan.primary.modelId,
       selectedModelIdentifier: plan.primary.modelIdentifier,
       selectedModelDisplayName: plan.primary.displayName,
       selectedProvider: plan.primary.providerId,
+      explicitModel,
 
       // Concise, stable explanation (shared semantics with consumer/business UI).
       // The full verbose explanation remains persisted internally on the RoutingDecision.
-      reason: buildConciseRoutingReason({
-        modelDisplayName: plan.primary.displayName,
-        complexity: plan.complexity,
-        taskType: plan.taskType,
-      }),
+      reason: explicitModel
+        ? `${plan.primary.displayName} was explicitly requested by the client.`
+        : buildConciseRoutingReason({
+            modelDisplayName: plan.primary.displayName,
+            complexity: plan.complexity,
+            taskType: plan.taskType,
+          }),
       taskType: plan.taskType,
       complexity: plan.complexity,
       projectedCost: plan.projectedCost,
@@ -214,6 +310,7 @@ function buildSuccessResponse(
       modelId: result.modelId ?? "",
       modelIdentifier: successfulAttempt?.modelIdentifier ?? "",
       provider: result.providerId ?? "",
+      finishReason: result.finishReason ?? null,
 
       fallbackUsed: result.fallback?.used === true,
       attempts: result.attempts,
@@ -271,7 +368,43 @@ function buildErrorResponse(
 // POST HANDLER
 // ─────────────────────────────────────────────────────
 
+/**
+ * POST /api/v1/chat/completions
+ *
+ * Adds the OpenAI error fields (`error.type`, `error.param`) to every
+ * error response produced by the handler, so OpenAI SDK clients receive
+ * the error shape they expect. Attentra's `success`, `requestId`,
+ * `error.code` and `error.message` are unchanged. Headers are preserved.
+ */
 export async function POST(request: NextRequest) {
+  const response = await handleChatCompletion(request);
+
+  if (response.status < 400) {
+    return response;
+  }
+
+  const body = (await response.json()) as {
+    error?: Record<string, unknown>;
+  } & Record<string, unknown>;
+
+  // The body is re-serialized; never forward a stale length.
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+
+  return NextResponse.json(
+    {
+      ...body,
+      error: {
+        ...body.error,
+        type: openAIErrorType(response.status),
+        param: body.error?.param ?? null,
+      },
+    },
+    { status: response.status, headers },
+  );
+}
+
+async function handleChatCompletion(request: NextRequest) {
   const requestId = generateRequestId();
 
   try {
@@ -394,6 +527,7 @@ export async function POST(request: NextRequest) {
           error: {
             code: "INVALID_REQUEST",
             message: validation.errors.join("; "),
+            param: validation.param ?? null,
           },
         },
         { status: 400 },
@@ -403,6 +537,8 @@ export async function POST(request: NextRequest) {
     const {
       messages,
       maxTokens,
+      temperature,
+      model,
       taskTypeHint,
       policy,
       requestId: clientRequestId,
@@ -433,9 +569,12 @@ export async function POST(request: NextRequest) {
         },
       },
 
-      policy
+      policy || model
         ? {
-            policy,
+            ...(policy && { policy }),
+            // Explicit model: restricted to that registry model, no
+            // cross-model fallback. Absent / "auto": automatic routing.
+            ...(model && { model }),
           }
         : undefined,
     );
@@ -574,6 +713,7 @@ export async function POST(request: NextRequest) {
       // × the executed model's pricing.
       {
         prisma,
+        ...(temperature !== undefined && { temperature }),
       },
     );
 
@@ -647,6 +787,7 @@ export async function POST(request: NextRequest) {
           result,
           executionFlow.plan,
           routingResult.decision,
+          model !== undefined,
         ),
       );
     }

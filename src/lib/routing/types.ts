@@ -357,7 +357,9 @@ export type RoutingErrorCode =
   | "ALL_EXCEED_CONTEXT"
   | "NO_PRICING_AVAILABLE"
   | "DATABASE_ERROR"
-  | "INVALID_POLICY";
+  | "INVALID_POLICY"
+  | "MODEL_NOT_FOUND"
+  | "AMBIGUOUS_MODEL";
 
 // ─────────────────────────────────────────────────────
 // PROJECTED COST

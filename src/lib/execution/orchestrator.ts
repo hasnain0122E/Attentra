@@ -139,6 +139,12 @@ export interface OrchestratorOptions extends ExecutionOptions {
    * When omitted, actualCost is left undefined on all attempts.
    */
   prisma?: PrismaClient;
+
+  /**
+   * Client sampling temperature (0.0–2.0), forwarded to every attempt.
+   * Provider adapters apply provider-specific constraints.
+   */
+  temperature?: number;
 }
 
 // ─────────────────────────────────────────────────────
@@ -282,7 +288,8 @@ export class ExecutionOrchestrator {
       const result = await dispatcher.executePlan(
         singleTargetPlan,
         messages,
-        { timeoutMs: options?.timeoutMs }
+        { timeoutMs: options?.timeoutMs },
+        { temperature: options?.temperature }
       );
 
       const attemptEnd = new Date();
@@ -432,6 +439,7 @@ function buildOrchestrationSuccess(
     modelId: winningTarget.modelId,
     providerRequestId: result.providerRequestId,
     content: result.content,
+    finishReason: result.finishReason,
     usage: result.usage,
     latencyMs: result.latencyMs,
     actualCost,

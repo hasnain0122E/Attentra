@@ -70,6 +70,13 @@ export interface RouterOptions {
 export interface DatabaseRouterOptions {
   /** Routing policy name or custom policy object */
   policy?: string | RoutingPolicy;
+
+  /**
+   * Explicitly requested model ("<modelIdentifier>" or
+   * "<provider>/<modelIdentifier>"). When set, routing is restricted to
+   * that single registry model (no cross-model fallback).
+   */
+  model?: string;
 }
 
 /**
@@ -78,6 +85,9 @@ export interface DatabaseRouterOptions {
 export interface RouteAndPersistOptions {
   /** Routing policy name or custom policy object */
   policy?: string | RoutingPolicy;
+
+  /** Explicitly requested model (see DatabaseRouterOptions.model) */
+  model?: string;
 }
 
 // ─────────────────────────────────────────────────────
@@ -93,12 +103,15 @@ export interface RouteAndPersistOptions {
  * @param request    The routing request
  * @param models     Pre-loaded model candidates
  * @param policyOpt  Policy name or object (optional)
+ * @param explicit   Candidates were explicitly chosen by the client
+ *                   (skip heuristic capability filtering)
  * @returns          Routing result with decision or structured error
  */
 function executeRoutingPipeline(
   request: RoutingRequest,
   models: ModelCandidate[],
-  policyOpt?: string | RoutingPolicy
+  policyOpt?: string | RoutingPolicy,
+  explicit = false
 ): RoutingResult {
   // 1. Analyze the request
   const analysis = analyzeRequest(
@@ -121,6 +134,7 @@ function executeRoutingPipeline(
     taskType: analysis.taskType,
     estimatedTotalTokens: analysis.tokenEstimate.totalTokens,
     requirePricing,
+    ignoreCapabilities: explicit,
   });
 
   // 5. Handle no eligible candidates
@@ -234,7 +248,37 @@ export async function routeWithDatabase(
       };
     }
 
-    // 2. Run pure routing pipeline
+    // 2. Explicit model: restrict routing to that registry model
+    if (options?.model) {
+      const resolved = resolveExplicitModel(loadResult.candidates, options.model);
+
+      if (!resolved.candidate) {
+        return {
+          success: false,
+          error: resolved.error,
+          errorCode: resolved.errorCode,
+        };
+      }
+
+      const result = executeRoutingPipeline(
+        request,
+        [resolved.candidate],
+        options.policy,
+        true
+      );
+
+      if (result.success && result.decision) {
+        result.decision.reason =
+          `Model explicitly requested by the client: ` +
+          `${resolved.candidate.displayName} ` +
+          `(${resolved.candidate.providerId}/${resolved.candidate.modelIdentifier}). ` +
+          `Automatic selection and cross-model fallback were not applied.`;
+      }
+
+      return result;
+    }
+
+    // 3. Run pure routing pipeline
     return executeRoutingPipeline(
       request,
       loadResult.candidates,
@@ -299,6 +343,56 @@ export async function routeAndPersist(
 // ─────────────────────────────────────────────────────
 // INTERNAL HELPERS
 // ─────────────────────────────────────────────────────
+
+/**
+ * Resolve an explicitly requested model against routable candidates
+ * (active models with current pricing).
+ *
+ * Accepts "<modelIdentifier>" or "<provider>/<modelIdentifier>".
+ * A bare identifier matching models from several providers is ambiguous.
+ */
+export function resolveExplicitModel(
+  candidates: ModelCandidate[],
+  requested: string
+):
+  | { candidate: ModelCandidate }
+  | { candidate?: undefined; errorCode: RoutingErrorCode; error: string } {
+  const exact = candidates.filter((c) => c.modelIdentifier === requested);
+
+  let matches = exact;
+
+  if (exact.length === 0 && requested.includes("/")) {
+    const slash = requested.indexOf("/");
+    const provider = requested.slice(0, slash).toLowerCase();
+    const identifier = requested.slice(slash + 1);
+
+    matches = candidates.filter(
+      (c) =>
+        c.modelIdentifier === identifier &&
+        (c.providerName ?? c.providerId).toLowerCase() === provider
+    );
+  }
+
+  if (matches.length === 1) {
+    return { candidate: matches[0] };
+  }
+
+  if (matches.length > 1) {
+    return {
+      errorCode: "AMBIGUOUS_MODEL",
+      error:
+        `Model '${requested}' is offered by several providers; ` +
+        `use '<provider>/${requested}'.`,
+    };
+  }
+
+  return {
+    errorCode: "MODEL_NOT_FOUND",
+    error:
+      `Model '${requested}' is not available for routing. ` +
+      `Use 'auto' or an active model identifier from the Attentra registry.`,
+  };
+}
 
 /**
  * Classify why routing failed based on rejected candidates.
