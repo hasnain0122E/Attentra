@@ -26,6 +26,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { validateApiKey } from "@/lib/api-keys";
+import { buildKeyPrefix } from "@/lib/api-keys/crypto";
+import type { ValidationFailureReason } from "@/lib/api-keys";
 
 import type { PrismaClient } from "@prisma/client";
 
@@ -58,8 +60,24 @@ export interface PersonalApiKeyRequester {
 }
 
 /** No valid authentication. */
+/**
+ * Why a request resolved to no requester.
+ *
+ * For server-side diagnostics only — the route returns the same
+ * 401 code for every reason.
+ */
+export type AuthFailureReason =
+  | "NO_CREDENTIALS"
+  | "MALFORMED_HEADER"
+  | ValidationFailureReason;
+
 export interface UnauthenticatedRequester {
   authType: "none";
+  reason?: AuthFailureReason;
+  /** Safe display prefix of the rejected key (atr_xxxxxx...), never the full key. */
+  keyPrefix?: string;
+  /** Length of the presented token (valid keys are 68), never its content. */
+  tokenLength?: number;
 }
 
 export type Requester =
@@ -147,8 +165,17 @@ export async function resolveRequester(
 
     // Key was present but invalid — return none.
     // The route handler decides whether to return 401.
+    return {
+      authType: "none",
+      reason: result.reason,
+      keyPrefix: result.reason === "MALFORMED" ? undefined : buildKeyPrefix(token),
+      tokenLength: token.length,
+    };
   }
 
   // ── 3. Unauthenticated ─────────────────────────────
-  return { authType: "none" };
+  return {
+    authType: "none",
+    reason: authorization?.trim() ? "MALFORMED_HEADER" : "NO_CREDENTIALS",
+  };
 }

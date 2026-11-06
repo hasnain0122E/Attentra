@@ -63,6 +63,51 @@ export const dynamic = "force-dynamic";
 // HELPERS
 // ─────────────────────────────────────────────────────
 
+/**
+ * Identity of the database this deployment reads API keys from
+ * ("<host>/<database>"), plus the deployment environment.
+ *
+ * Logged on authentication failures so a key that is valid in one
+ * database but rejected here can be traced to an environment mismatch.
+ * Never includes credentials or the full connection string.
+ */
+const DATABASE_IDENTITY = (() => {
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? "");
+    return `${url.hostname || "unset"}${url.pathname || ""}`;
+  } catch {
+    return "unparseable";
+  }
+})();
+
+const DEPLOYMENT_ENV =
+  process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown";
+
+/**
+ * Structured authentication-failure log line.
+ *
+ * Callers pass only safe fields: never the Authorization header,
+ * the raw key, its hash, or provider credentials.
+ */
+function logAuthFailure(fields: {
+  requestId: string;
+  reason: string;
+  keyPrefix?: string;
+  tokenLength?: number;
+  errorCode?: string;
+}) {
+  console.warn(
+    "[chat-completions] Authentication rejected.",
+    "requestId:", fields.requestId,
+    "reason:", fields.reason,
+    "keyPrefix:", fields.keyPrefix ?? "n/a",
+    "tokenLength:", fields.tokenLength ?? "n/a",
+    ...(fields.errorCode ? ["errorCode:", fields.errorCode] : []),
+    "env:", DEPLOYMENT_ENV,
+    "dbHost:", DATABASE_IDENTITY,
+  );
+}
+
 /** Generate a unique request ID. */
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -73,9 +118,10 @@ function generateRequestId(): string {
  */
 function errorToHttpStatus(code: string): number {
   switch (code) {
-    case "AUTHENTICATION":
-    case "MISSING_API_KEY":
-      return 401;
+    // AUTHENTICATION / MISSING_API_KEY here come from the upstream
+    // provider (Attentra's server-side provider credentials), not from
+    // the caller's Attentra key — they fall through to 502 so clients
+    // do not mistake a provider misconfiguration for their own 401.
 
     case "RATE_LIMIT":
       return 429;
@@ -232,9 +278,53 @@ export async function POST(request: NextRequest) {
     // ── 1. Authentication ──────────────────────────────
     //
     // Unified resolver: Auth.js session first, then Bearer API key.
-    const requester = await resolveRequester(request.headers);
+    //
+    // A failure to *check* credentials (database or session backend
+    // unavailable) is a 503, never a 401 — the key may be valid.
+    let requester: Awaited<ReturnType<typeof resolveRequester>>;
+
+    try {
+      requester = await resolveRequester(request.headers);
+    } catch (authError) {
+      const isDatabaseError =
+        authError instanceof Error &&
+        authError.name.startsWith("PrismaClient");
+      const errorCode =
+        (authError as { code?: unknown })?.code ??
+        (authError instanceof Error ? authError.name : "unknown");
+
+      logAuthFailure({
+        requestId,
+        reason: isDatabaseError ? "DATABASE_ERROR" : "AUTH_BACKEND_ERROR",
+        errorCode: String(errorCode),
+      });
+
+      return NextResponse.json(
+        buildErrorResponse(requestId, {
+          code: "SERVICE_UNAVAILABLE",
+          message: "Authentication is temporarily unavailable. Please retry.",
+          retryable: true,
+        }),
+        { status: 503 },
+      );
+    }
 
     if (requester.authType === "none") {
+      // Log the specific reason server-side (never the full key) so
+      // rejected keys can be diagnosed from runtime logs by requestId.
+      logAuthFailure({
+        requestId,
+        reason: requester.reason ?? "unknown",
+        keyPrefix: requester.keyPrefix,
+        tokenLength: requester.tokenLength,
+      });
+
+      // Same code for every reason; the message only separates
+      // "no credentials" from "credentials rejected".
+      const hasCredentials =
+        requester.reason !== undefined &&
+        requester.reason !== "NO_CREDENTIALS";
+
       return NextResponse.json(
         {
           success: false,
@@ -242,10 +332,15 @@ export async function POST(request: NextRequest) {
 
           error: {
             code: "AUTHENTICATION",
-            message: "Authentication required",
+            message: hasCredentials
+              ? "Invalid API key. Send a valid, active key as 'Authorization: Bearer atr_...'"
+              : "Authentication required",
           },
         },
-        { status: 401 },
+        {
+          status: 401,
+          headers: { "WWW-Authenticate": "Bearer" },
+        },
       );
     }
 
