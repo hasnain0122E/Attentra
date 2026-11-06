@@ -82,6 +82,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     request: {
       update: mockRequestUpdate,
+      // Phase 2B rate limiter: no recent requests in the window.
+      aggregate: async () => ({ _count: { _all: 0 }, _min: { createdAt: null } }),
     },
   },
 }));
@@ -124,6 +126,7 @@ vi.mock("@/lib/execution", async () => {
 // ─────────────────────────────────────────────────────
 
 import { POST } from "@/app/api/v1/chat/completions/route";
+import { resetInstanceRateLimiter } from "@/lib/rate-limit";
 
 // ─────────────────────────────────────────────────────
 // SETUP
@@ -131,6 +134,7 @@ import { POST } from "@/app/api/v1/chat/completions/route";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetInstanceRateLimiter();
 
   /**
    * All tests are authenticated by default (session auth).

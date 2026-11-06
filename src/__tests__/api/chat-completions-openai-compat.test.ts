@@ -95,6 +95,8 @@ const fakePrisma = vi.hoisted(() => ({
   },
   request: {
     update: (...args: unknown[]) => mockRequestUpdate(...args),
+    // Phase 2B rate limiter: no recent requests in the window.
+    aggregate: async () => ({ _count: { _all: 0 }, _min: { createdAt: null } }),
   },
 }));
 
@@ -119,6 +121,7 @@ vi.mock("@/lib/execution", async () => {
 });
 
 import { POST } from "@/app/api/v1/chat/completions/route";
+import { resetInstanceRateLimiter } from "@/lib/rate-limit";
 import {
   createBusinessApiKey,
   createPersonalApiKey,
@@ -214,6 +217,7 @@ let personalKeyId: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  resetInstanceRateLimiter();
   rows.length = 0;
 
   // Programmatic clients: no Auth.js browser session.

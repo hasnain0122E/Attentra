@@ -59,7 +59,11 @@ const ROLE_ALIASES: Record<string, string> = { developer: "system" };
 /** Models value that selects Attentra's automatic routing. */
 export const AUTO_MODEL = "auto";
 
-const MAX_TOKENS_LIMIT = 256_000;
+/**
+ * Maximum explicit output tokens per request (spend protection).
+ * Applies to maxTokens, max_tokens and max_completion_tokens.
+ */
+export const MAX_OUTPUT_TOKENS = 4_096;
 
 /** Parameters accepted only at their default (no-op) value. */
 const DEFAULT_ONLY: Record<string, (v: unknown) => boolean> = {
@@ -290,10 +294,10 @@ export function validateChatRequest(body: unknown):
       typeof mt !== "number" ||
       !Number.isInteger(mt) ||
       mt <= 0 ||
-      mt > MAX_TOKENS_LIMIT
+      mt > MAX_OUTPUT_TOKENS
     ) {
       return fail(
-        `'${field}' must be a positive integer (max ${MAX_TOKENS_LIMIT})`,
+        `'${field}' must be a positive integer (max ${MAX_OUTPUT_TOKENS})`,
         field
       );
     }

@@ -45,6 +45,12 @@ import {
   type OrchestratorResult,
 } from "@/lib/execution";
 import { prisma } from "@/lib/prisma";
+import {
+  RateLimitUnavailableError,
+  checkRequestRateLimit,
+  type RateLimitDecision,
+  type RateLimitSubject,
+} from "@/lib/rate-limit";
 import { buildConciseRoutingReason } from "@/lib/routing/explanations";
 import { prepareExecutionFlow, routeAndPersist } from "@/lib/routing";
 import type {
@@ -543,6 +549,71 @@ async function handleChatCompletion(request: NextRequest) {
       policy,
       requestId: clientRequestId,
     } = validation.data;
+
+    // ── 4b. Rate limit — before routing or any provider call ──
+    //
+    // Per API key, or per user for browser sessions (Playground).
+    const rateSubject: RateLimitSubject =
+      requester.authType === "session"
+        ? { kind: "session", userId: requester.userId }
+        : { kind: "apiKey", apiKeyId: requester.apiKeyId };
+
+    let rateDecision: RateLimitDecision;
+
+    try {
+      rateDecision = await checkRequestRateLimit(prisma, rateSubject);
+    } catch (rateError) {
+      // Fail closed: without a usage count, do not spend on providers.
+      console.error(
+        "[chat-completions] Rate limit check unavailable.",
+        "requestId:", requestId,
+        "subject:", rateSubject.kind,
+        "error:", rateError instanceof RateLimitUnavailableError && rateError.cause instanceof Error
+          ? rateError.cause.name
+          : "unknown",
+      );
+
+      return NextResponse.json(
+        buildErrorResponse(requestId, {
+          code: "SERVICE_UNAVAILABLE",
+          message: "Usage limits could not be verified. Please retry.",
+          retryable: true,
+        }),
+        { status: 503 },
+      );
+    }
+
+    if (!rateDecision.allowed) {
+      const retryAfter = rateDecision.retryAfterSeconds ?? rateDecision.windowSeconds;
+
+      console.warn(
+        "[chat-completions] Rate limit exceeded.",
+        "requestId:", requestId,
+        "subject:", rateSubject.kind,
+        "limit:", rateDecision.limit,
+        "rejectedBy:", rateDecision.rejectedBy,
+        "retryAfter:", retryAfter,
+      );
+
+      return NextResponse.json(
+        buildErrorResponse(requestId, {
+          code: "RATE_LIMIT_EXCEEDED",
+          message:
+            `Rate limit exceeded: ${rateDecision.limit} requests per ` +
+            `${rateDecision.windowSeconds} seconds per ` +
+            `${rateSubject.kind === "apiKey" ? "API key" : "user session"}. ` +
+            `Retry after ${retryAfter} seconds.`,
+          retryable: true,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfter),
+            "X-RateLimit-Limit": String(rateDecision.limit),
+          },
+        },
+      );
+    }
 
     // ── 5. Resolve request ID ─────────────────────────
     const effectiveRequestId = clientRequestId || requestId;
