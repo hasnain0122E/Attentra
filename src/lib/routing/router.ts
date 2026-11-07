@@ -43,7 +43,12 @@ import type {
 import { analyzeRequest } from "./analyzer";
 import { filterCandidates } from "./candidates";
 import { scoreCandidates } from "./scorer";
-import { orderFallbacks } from "./fallback";
+import {
+  applyFallbackCostCeiling,
+  describeFallbackCostFilter,
+  orderFallbacks,
+  resolveFallbackCostCeiling,
+} from "./fallback";
 import { explainDecision } from "./explanations";
 import { resolvePolicy } from "./policies";
 import { loadRoutingCandidates } from "./database";
@@ -160,8 +165,15 @@ function executeRoutingPipeline(
   // 7. Select best candidate
   const selected = scored[0];
 
-  // 8. Provider-diverse fallback ordering
-  const fallbacks = orderFallbacks(scored, selected);
+  // 8. Provider-diverse fallback ordering, then the optional projected-cost
+  //    ceiling (ROUTING_MAX_FALLBACK_COST_MULTIPLIER; unset → no change)
+  const costCeiling = resolveFallbackCostCeiling();
+  const costFilter = applyFallbackCostCeiling(
+    selected,
+    orderFallbacks(scored, selected),
+    costCeiling
+  );
+  const fallbacks = costFilter.fallbacks;
 
   // 9. Build routing decision
   const decision: RoutingDecision = {
@@ -177,7 +189,8 @@ function executeRoutingPipeline(
   };
 
   // 10. Generate human-readable explanation
-  decision.reason = explainDecision(decision);
+  decision.reason =
+    explainDecision(decision) + describeFallbackCostFilter(costFilter, costCeiling);
 
   return {
     success: true,
