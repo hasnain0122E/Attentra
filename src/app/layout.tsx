@@ -22,9 +22,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Attentra — The routing ledger for enterprise AI spend',
+  title: 'Attentra — One API. Many models. Smarter routing.',
   description:
-    'Attentra is an intelligent AI routing platform that evaluates every request and routes it to the best-fit model based on task requirements, capability, cost and latency — with full, auditable cost and savings intelligence. Cut AI infrastructure costs significantly without sacrificing output quality.',
+    'Attentra is an OpenAI-compatible AI gateway. For each request it weighs the task, its complexity and the estimated cost, picks an eligible model from OpenAI, Anthropic or Google, falls back to another provider if one fails, and records why — with the calculated cost of every request.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

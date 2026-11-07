@@ -15,27 +15,29 @@ import {
   Lightning,
 } from "@phosphor-icons/react";
 
+// Illustrative figures for the in-browser simulation only — not live
+// prices or measurements.
 const models = [
   {
     name: "GPT-4.1",
     provider: "OpenAI",
-    latency: "620ms",
+    latency: "~620ms",
     cost: "$0.012",
-    quality: 91,
+    profile: "Strong reasoning",
   },
   {
     name: "Claude Sonnet",
     provider: "Anthropic",
-    latency: "480ms",
+    latency: "~480ms",
     cost: "$0.008",
-    quality: 94,
+    profile: "Balanced",
   },
   {
     name: "Gemini Flash",
     provider: "Google",
-    latency: "210ms",
+    latency: "~210ms",
     cost: "$0.003",
-    quality: 96,
+    profile: "Fast · low cost",
   },
 ];
 
@@ -64,11 +66,15 @@ export default function ProductDemo() {
   const [priority, setPriority] = useState("Balanced");
 
   const [selectedModel, setSelectedModel] = useState(2);
+  const [reason, setReason] = useState(
+    "Summarization at this size is simple work, so the lowest estimated cost wins."
+  );
   const [isRouting, setIsRouting] = useState(false);
   const [hasRouted, setHasRouted] = useState(true);
   const [routingStep, setRoutingStep] = useState(0);
 
   const currentModel = models[selectedModel];
+  const fallbackModel = models[selectedModel === 2 ? 0 : 2];
 
   const promptTokens = useMemo(() => {
     if (!prompt.trim()) return 0;
@@ -76,78 +82,63 @@ export default function ProductDemo() {
     return Math.max(1, Math.ceil(prompt.trim().split(/\s+/).length * 1.3));
   }, [prompt]);
 
-  function determineModel() {
+  function determineModel(): { index: number; reason: string } {
     const lowerPrompt = prompt.toLowerCase();
 
     /*
-     * This is intentionally NOT a real routing algorithm.
-     * It simply creates believable deterministic demo behavior.
+     * This is intentionally NOT the real routing algorithm.
+     * It is deterministic demo behavior that mirrors the idea:
+     * priority and task shift which model ranks first.
      */
 
     if (priority === "Lowest latency") {
-      return 2;
+      return { index: 2, reason: "Speed priority: the fastest capable model ranks first." };
     }
 
     if (priority === "Lowest cost") {
-      return 2;
+      return { index: 2, reason: "Cost priority: the lowest estimated cost ranks first." };
     }
 
-    if (priority === "Highest quality") {
-      if (
-        task === "Coding" ||
-        task === "Reasoning" ||
-        lowerPrompt.includes("code") ||
-        lowerPrompt.includes("analyze") ||
-        lowerPrompt.includes("reason")
-      ) {
-        return 0;
-      }
-
-      return 1;
-    }
-
-    if (
+    const looksLikeCode =
       task === "Coding" ||
       lowerPrompt.includes("code") ||
       lowerPrompt.includes("debug") ||
-      lowerPrompt.includes("program")
-    ) {
-      return 0;
-    }
+      lowerPrompt.includes("program");
 
-    if (
+    const looksComplex =
       task === "Reasoning" ||
       lowerPrompt.includes("reason") ||
       lowerPrompt.includes("complex") ||
-      lowerPrompt.includes("analyze")
-    ) {
-      return 1;
+      lowerPrompt.includes("analyze");
+
+    if (priority === "Highest quality") {
+      return looksLikeCode || looksComplex
+        ? { index: 0, reason: "Quality priority on a hard task: the strongest reasoning model ranks first." }
+        : { index: 1, reason: "Quality priority on a moderate task: a balanced model is strong enough." };
     }
 
-    if (
-      task === "Summarization" ||
-      task === "Classification" ||
-      task === "General"
-    ) {
-      return 2;
+    if (looksLikeCode) {
+      return { index: 0, reason: "Coding task: capability outweighs the higher estimated cost." };
+    }
+
+    if (looksComplex) {
+      return { index: 1, reason: "Multi-step reasoning: a balanced model is worth the extra cost." };
     }
 
     if (task === "Creative writing") {
-      return 1;
+      return { index: 1, reason: "Writing quality matters here, so a balanced model ranks first." };
     }
 
-    /*
-     * Fallback rotation makes repeated clicks visibly change
-     * the selected model for generic prompts.
-     */
-
-    return (selectedModel + 1) % models.length;
+    return {
+      index: 2,
+      reason: `${task} at this size is simple work, so the lowest estimated cost wins.`,
+    };
   }
 
   function handleRouting() {
     if (isRouting) return;
 
-    const nextModel = determineModel();
+    const next = determineModel();
 
     setIsRouting(true);
     setHasRouted(false);
@@ -162,7 +153,8 @@ export default function ProductDemo() {
     }, 1000);
 
     window.setTimeout(() => {
-      setSelectedModel(nextModel);
+      setSelectedModel(next.index);
+      setReason(next.reason);
       setHasRouted(true);
       setIsRouting(false);
       setRoutingStep(0);
@@ -205,7 +197,7 @@ export default function ProductDemo() {
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
-              Try the routing engine
+              Interactive simulation
             </span>
           </motion.div>
 
@@ -237,8 +229,9 @@ export default function ProductDemo() {
             }}
             className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[var(--color-foreground-secondary)] sm:text-lg"
           >
-            Try different prompts, tasks, and priorities. Watch Attentra
-            evaluate the available models and select the best fit.
+            Change the task or the priority and watch a different model come
+            out on top — with the reason spelled out. This version runs in
+            your browser; the Playground runs the real router.
           </motion.p>
         </div>
 
@@ -475,7 +468,7 @@ export default function ProductDemo() {
                               "Evaluating available models"}
 
                             {routingStep === 3 &&
-                              "Selecting the best fit"}
+                              "Ranking the candidates"}
                           </motion.p>
                         </AnimatePresence>
 
@@ -515,18 +508,18 @@ export default function ProductDemo() {
                   </div>
 
                   <h3 className="mt-2 text-lg font-semibold tracking-[-0.025em] text-[var(--color-foreground)]">
-                    Best fit selected
+                    Selected for this request
                   </h3>
                 </div>
 
                 <AnimatePresence mode="wait">
                   <motion.span
-                    key={hasRouted ? "optimized" : "waiting"}
+                    key={hasRouted ? "simulated" : "waiting"}
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="rounded-full bg-[var(--color-success-soft)] px-3 py-1.5 text-[9px] font-medium text-[var(--color-success)]"
                   >
-                    {hasRouted ? "OPTIMIZED" : "WAITING"}
+                    {hasRouted ? "SIMULATED" : "WAITING"}
                   </motion.span>
                 </AnimatePresence>
               </div>
@@ -576,25 +569,38 @@ export default function ProductDemo() {
                       </div>
                     </div>
 
-                    <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--color-border)] rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
+                    <p className="mt-4 text-[12px] leading-5 text-[var(--color-foreground-secondary)]">
+                      <span className="font-semibold text-[var(--color-foreground)]">
+                        Why:{" "}
+                      </span>
+                      {reason}
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--color-border)] rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
                       <ResultMetric
                         icon={<Sparkle size={12} />}
-                        label="QUALITY"
-                        value={`${currentModel.quality}`}
+                        label="PROFILE"
+                        value={currentModel.profile}
                       />
 
                       <ResultMetric
                         icon={<Gauge size={12} />}
-                        label="LATENCY"
+                        label="EST. LATENCY"
                         value={currentModel.latency}
                       />
 
                       <ResultMetric
                         icon={<CurrencyDollar size={12} />}
-                        label="COST"
+                        label="EST. COST"
                         value={currentModel.cost}
                       />
                     </div>
+
+                    <p className="mt-3 text-[11px] leading-5 text-[var(--color-foreground-muted)]">
+                      If {currentModel.provider} fails, the request moves to
+                      the next eligible model on another provider — here,{" "}
+                      {fallbackModel.name}.
+                    </p>
                   </div>
                 </motion.div>
               </AnimatePresence>
@@ -639,8 +645,8 @@ export default function ProductDemo() {
 
               <span className="font-mono text-[8px] tracking-[0.1em] text-[var(--color-foreground-muted)]">
                 {isRouting
-                  ? "ROUTING REQUEST..."
-                  : `ROUTING COMPLETE · ${currentModel.latency}`}
+                  ? "SIMULATING DECISION..."
+                  : "SIMULATED DECISION · ILLUSTRATIVE FIGURES"}
               </span>
             </div>
 
@@ -672,9 +678,10 @@ export default function ProductDemo() {
           className="mx-auto mt-12 max-w-2xl text-center"
         >
           <p className="text-sm leading-6 text-[var(--color-foreground-secondary)]">
-            This interactive demo simulates Attentra&apos;s routing
-            decisions. The production engine will evaluate real model
-            performance, cost, latency, and task requirements.
+            This demo runs in your browser with fixed, illustrative numbers —
+            no AI provider is called. The production router ranks currently
+            priced models from OpenAI, Anthropic and Google and returns its
+            reason with every response. Sign in to try it in the Playground.
           </p>
         </motion.div>
       </div>
@@ -776,7 +783,7 @@ function ModelRow({
     provider: string;
     latency: string;
     cost: string;
-    quality: number;
+    profile: string;
   };
   selected: boolean;
   isRouting: boolean;
@@ -825,17 +832,17 @@ function ModelRow({
       <div className="flex shrink-0 items-center gap-4 text-right">
         <div className="hidden sm:block">
           <div className="font-mono text-[8px] text-[var(--color-foreground-muted)]">
-            SCORE
+            PROFILE
           </div>
 
           <div className="mt-0.5 text-[10px] font-medium text-[var(--color-foreground)]">
-            {model.quality}
+            {model.profile}
           </div>
         </div>
 
         <div>
           <div className="font-mono text-[8px] text-[var(--color-foreground-muted)]">
-            LATENCY
+            EST. LATENCY
           </div>
 
           <div className="mt-0.5 text-[10px] font-medium text-[var(--color-foreground)]">
@@ -845,7 +852,7 @@ function ModelRow({
 
         <div>
           <div className="font-mono text-[8px] text-[var(--color-foreground-muted)]">
-            COST
+            EST. COST
           </div>
 
           <div className="mt-0.5 text-[10px] font-medium text-[var(--color-foreground)]">

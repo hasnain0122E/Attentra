@@ -5,11 +5,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, List, X } from "@phosphor-icons/react";
 import Image from "next/image";
 const navItems = [
-  { label: "Product", href: "#product" },
   { label: "How it works", href: "#how-it-works" },
-  { label: "Why Attentra", href: "#why-attentra" },
-  { label: "Use cases", href: "#use-cases" },
-  { label: "Developer", href: "#developers" },
+  { label: "Demo", href: "#product-demo" },
+  { label: "Benefits", href: "#why-attentra" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "Docs", href: "#developers" },
 ];
 
 export default function Navbar() {
@@ -118,17 +118,17 @@ export default function Navbar() {
 
           <div className="hidden items-center gap-2 md:flex">
             <a
-              href="#docs"
+              href="/login"
               className="rounded-full px-4 py-2 text-[13px] font-medium text-[var(--color-foreground-secondary)] transition-colors hover:text-[var(--color-foreground)]"
             >
-              Docs
+              Log in
             </a>
 
             <a
               href="/signup"
               className="group flex items-center gap-1.5 rounded-full bg-[var(--color-accent)] px-4 py-2.5 text-[13px] font-medium text-white transition-transform duration-200 hover:-translate-y-0.5"
             >
-              Get access
+              Get started
               <ArrowUpRight
                 size={14}
                 strokeWidth={1.8}
@@ -201,11 +201,11 @@ export default function Navbar() {
                 ))}
 
                 <a
-                  href="#docs"
+                  href="/login"
                   onClick={closeMobile}
                   className="rounded-2xl px-4 py-3.5 text-sm font-medium text-[var(--color-foreground-secondary)] transition-colors hover:bg-[var(--color-surface-soft)] hover:text-[var(--color-foreground)]"
                 >
-                  Docs
+                  Log in
                 </a>
 
                 <a
@@ -213,7 +213,7 @@ export default function Navbar() {
                   onClick={closeMobile}
                   className="mt-1 flex items-center justify-center gap-2 rounded-2xl bg-[var(--color-accent)] px-4 py-3.5 text-sm font-medium text-white"
                 >
-                  Get access
+                  Get started
                   <ArrowUpRight size={15} />
                 </a>
               </nav>

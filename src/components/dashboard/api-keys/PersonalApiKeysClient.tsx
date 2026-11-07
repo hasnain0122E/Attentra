@@ -317,6 +317,8 @@ export default function PersonalApiKeysClient() {
             </button>
           </section>
 
+          <FirstCallGuide />
+
           {/* Billing notice */}
           <BillingNotice />
         </div>
@@ -579,6 +581,8 @@ export default function PersonalApiKeysClient() {
           </section>
         )}
 
+        <FirstCallGuide />
+
         {/* Billing notice */}
         <BillingNotice />
       </div>
@@ -627,11 +631,12 @@ function BillingNotice() {
   return (
     <div className="rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <div className="font-mono text-[7px] uppercase tracking-[0.09em] text-[var(--color-foreground-muted)]">
-        Usage &amp; billing
+        Billing preview
       </div>
       <p className="mt-2 text-[9px] leading-5 text-[var(--color-foreground-secondary)]">
-        Production API usage is billed pay as you go. Attentra charges
-        10% of verified savings.
+        No charges are collected during the MVP. The planned fee is 10% of
+        savings measured against a baseline model — only when there are
+        savings.
       </p>
     </div>
   );
@@ -719,7 +724,8 @@ function CreateKeyModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 w-full max-w-[540px] overflow-hidden rounded-[26px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_30px_100px_rgba(25,23,21,0.20)]"
+        aria-label="API key created"
+        className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-[540px] overflow-y-auto rounded-[26px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_30px_100px_rgba(25,23,21,0.20)]"
       >
         <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] p-5 sm:p-6">
           <div>
@@ -903,6 +909,8 @@ function CreatedKeyModal({
             )}
           </div>
 
+          <FirstCallGuide className="mt-5" />
+
           <button
             type="button"
             onClick={onClose}
@@ -913,6 +921,106 @@ function CreatedKeyModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────
+// FIRST CALL GUIDE
+// ─────────────────────────────────────────────────────
+
+/** Production API base URL for the OpenAI SDK's base_url. */
+const API_BASE_URL = "https://attentra-nine.vercel.app/api/v1";
+
+const PYTHON_EXAMPLE = `import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="${API_BASE_URL}",
+    api_key=os.environ["ATTENTRA_API_KEY"],
+)
+
+r = client.chat.completions.create(
+    model="auto",
+    max_tokens=500,
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(r.model, r.choices[0].message.content)`;
+
+/**
+ * How to make a first request with a personal key, using the official
+ * OpenAI Python SDK (Attentra has no SDK of its own).
+ */
+function FirstCallGuide({ className = "" }: { className?: string }) {
+  const [copiedItem, setCopiedItem] = useState<"url" | "code" | null>(null);
+
+  async function copy(text: string, item: "url" | "code") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedItem(item);
+      window.setTimeout(() => setCopiedItem(null), 1400);
+    } catch {
+      // Clipboard unavailable (permissions/insecure context) — text stays selectable.
+    }
+  }
+
+  return (
+    <section
+      aria-label="Make your first API call"
+      className={`rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background)] p-4 ${className}`}
+    >
+      <div className="font-mono text-[7px] uppercase tracking-[0.09em] text-[var(--color-accent)]">
+        Make your first call · official OpenAI Python SDK
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="shrink-0 text-[9px] font-medium text-[var(--color-foreground-secondary)]">
+          Base URL
+        </span>
+        <code className="min-w-0 flex-1 truncate font-mono text-[10px] text-[var(--color-foreground)] select-all">
+          {API_BASE_URL}
+        </code>
+        <button
+          type="button"
+          onClick={() => void copy(API_BASE_URL, "url")}
+          aria-label="Copy base URL"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-foreground-muted)] transition hover:text-[var(--color-accent)]"
+        >
+          {copiedItem === "url" ? <Check size={12} weight="bold" /> : <Copy size={12} />}
+        </button>
+      </div>
+
+      <div className="relative mt-3">
+        <pre className="max-h-56 overflow-auto rounded-xl bg-[var(--color-foreground)] p-3 font-mono text-[9.5px] leading-[1.55] text-white/85">
+          <code>{PYTHON_EXAMPLE}</code>
+        </pre>
+        <button
+          type="button"
+          onClick={() => void copy(PYTHON_EXAMPLE, "code")}
+          aria-label="Copy Python example"
+          className="absolute right-2 top-2 flex h-7 items-center gap-1 rounded-lg bg-white/10 px-2 font-mono text-[7px] uppercase tracking-[0.08em] text-white/80 transition hover:bg-white/20"
+        >
+          {copiedItem === "code" ? <Check size={11} weight="bold" /> : <Copy size={11} />}
+          {copiedItem === "code" ? "Copied" : "Copy"}
+        </button>
+      </div>
+
+      <ul className="mt-3 space-y-1 text-[9px] leading-4 text-[var(--color-foreground-secondary)]">
+        <li>
+          Keep the key in an environment variable such as{" "}
+          <code className="font-mono">ATTENTRA_API_KEY</code> — never in code
+          or a repository. Revoke it here if it leaks.
+        </li>
+        <li>
+          <code className="font-mono">max_tokens</code> up to 4,096 (256 if
+          you don&apos;t set it).
+        </li>
+        <li>
+          About 20 requests per minute per key (best effort across server
+          instances).
+        </li>
+        <li>Streaming isn&apos;t supported yet — leave stream off.</li>
+      </ul>
+    </section>
   );
 }
 

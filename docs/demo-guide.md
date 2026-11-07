@@ -1,93 +1,120 @@
-# Attentra — Demo Guide
+# Attentra — Demo Guide (Investor Pitch, November 8, 2026)
 
-Everything needed to run a reliable 3–5 minute judge demo.
+Everything needed for a reliable 5-minute demo on **production**:
+`https://attentra-nine.vercel.app`.
 
 ---
 
-## 1. Pre-Demo Checklist (night before)
+## 1. What to Say Attentra Does (accurate one-liner)
 
-- [ ] `npm run build` succeeds locally
-- [ ] `npx prisma migrate status` → "Database schema is up to date"
-- [ ] `.env` / `.env.local` contain real `DATABASE_URL`, `GOOGLE_CLIENT_ID/SECRET`, `AUTH_SECRET`, provider keys, `CRON_SECRET`, `CONSUMER_BASELINE_MODEL`
-- [ ] Dev server boots: `npm run dev` → http://localhost:3000
-- [ ] Demo account exists and is signed in once (session cookie warm)
-- [ ] Business workspace exists with a **real organization name** and at least one member
-- [ ] Model registry seeded (`npm run db:seed`) and pricing synced (cron or `npm run pricing:sync`)
-- [ ] `RUN_LIVE_PROVIDER_TESTS` is **not** exported in your shell for the demo session
-- [ ] Close all tabs except the demo tab; browser zoom 100%; do-not-disturb on
+> "Attentra is an OpenAI-compatible gateway. For each request it reads the task and its complexity, ranks the eligible models from OpenAI, Anthropic and Google by estimated cost, latency estimates and capability under your chosen policy, falls back to another provider if an attempt fails, and records why it chose — plus the calculated cost."
 
-## 2. Expected Account State
+**Do not claim:**
+- "cheapest model every time" or "optimal" routing;
+- measured latency or quality benchmarks (latency and capability are model-profile estimates);
+- guaranteed savings (savings compare actual cost with a configured baseline model);
+- live billing (pricing is a preview; no payments are collected);
+- streaming (not supported).
 
-| Artifact | Expected state |
-|---|---|
-| Consumer account | Signed-in via Google; a few historical requests in `/dashboard/history` so charts are populated |
-| Playground | Empty on load (fine — first run generates the story) |
-| Personal API keys | 1–2 existing keys; have one **new** key created live |
-| Business workspace | Named organization (not placeholder text); 1+ member; 1+ business API key; baseline model configured in Settings |
-| Billing pages | Some data for the current month; coverage may be partial — that is honest and explained |
+---
 
-## 3. The 3–5 Minute Judge Demo Flow
+## 2. Pre-Demo Checklist
 
-### Act 0 — Landing (0:00–0:30)
-1. Open `/`. Walk the value line: *"Teams overpay for AI because model choice is manual. Attentra routes every request to the cheapest capable model and bills 10% of verified savings."*
-2. Click **Get started** → `/login` → **Continue with Google** (already authorized → instant).
+**The night before:**
+- [ ] The latest commit is deployed to Production. Note the deployment ID for Instant Rollback.
+- [ ] One API key exists for the demo account. Store it on the laptop as an environment variable (`ATTENTRA_API_KEY`), never in a file you will show.
+- [ ] Python with the official SDK is installed: `python -m pip install openai`. `demo.py` is ready (§5).
+- [ ] **Backup recording**: a 2–3 minute screen recording of the full flow (Playground → History → SDK call → History) on the laptop desktop.
+- [ ] Know which **baseline model** savings are compared against. Consumer: `CONSUMER_BASELINE_MODEL` in Vercel (e.g. `claude-sonnet-5`). Business: the model set in the workspace Settings.
 
-### Act 1 — Consumer Dashboard (0:30–1:15)
-3. Land on `/dashboard`. Point at overview cards: real request counts, real spend, cost intelligence from the database.
-4. Open **Playground** (`/dashboard/playground`). Type the safe prompt (§4) and run.
-5. Narrate while it resolves: routing decision card → selected model, task type, complexity, projected cost, routing score, candidate ranking (top 5), concise "Why this model" explanation.
+**T−30 minutes, at the venue:**
+- [ ] Open `https://attentra-nine.vercel.app` in the browser and sign in with Google (already signed in is best).
+- [ ] **Network check, once:** run `demo.py`.
+  - If it prints an answer, the network is fine.
+  - If you see **HTTP 403 / "Vercel Security Checkpoint" / `X-Vercel-Mitigated: challenge`**, Vercel's automatic DDoS protection is challenging this network. **Switch the laptop to a mobile hotspot** and re-check. Do not retry in a loop.
+- [ ] **Warm up:** send one Playground prompt (the first request after idle can take ~10–15 s).
+- [ ] Open a tab on **History** with a request that shows **"Fallback used"** (e.g. 2026-11-06 20:51 UTC: routed Gemini 2.5 Flash → executed GPT-4o).
+- [ ] Browser zoom 100%, notifications off, close unrelated tabs.
 
-### Act 2 — Transparency & History (1:15–2:00)
-6. Open **History** (`/dashboard/history`) → the request that just ran. Show detail: prompt/response, actual cost vs baseline cost, latency, routing overview.
-7. One sentence: *"Every request stores an audit trail — the full routing decision, candidate list, and both actual and baseline cost."*
+**Limits to respect during the demo:**
+- Playground: **10 requests/minute per user**. Don't click "Run" repeatedly.
+- API: **20 requests/minute per key**, `max_tokens` ≤ 4,096 (default 256).
+- `stream=True` is **not supported** (returns a clear 400).
 
-### Act 3 — Developer API (2:00–3:00)
-8. Open **API keys** (`/dashboard/api-keys`). Create a key → show the **one-time** raw key modal → copy it → Done. Say: *"Shown once; only a SHA-256 hash is stored."*
-9. Paste a ready `curl` (below) into a terminal and run it live. The JSON response shows `routing.reason`, candidates, usage, `actualCost`.
+---
 
-```bash
-curl -s -X POST http://localhost:3000/api/v1/chat/completions \
-  -H "Authorization: Bearer PASTE_RAW_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Reply with exactly: routed."}]}'
+## 3. The 5-Minute Pitch Sequence
+
+| Time | Segment | Do | Say |
+|---|---|---|---|
+| 0:00–0:40 | **What & why** | Landing hero, then scroll to "Different requests need different models" | "Teams hard-code one model. A ticket classifier and a production bug hunt pay the same price, and a provider outage takes the app down. Attentra decides per request, across providers." |
+| 0:40–1:50 | **Live routing** | Playground: a simple prompt (§4) | Point at the selected model, the reason, the candidate ranking, **projected vs actual cost**, and savings **vs the baseline model (name it)** |
+| 1:50–2:30 | **Different task, different model** | Playground: a rehearsed reasoning prompt (§4) | "Same API, different decision. Here's why it chose a stronger model." |
+| 2:30–3:15 | **Reliability** | History → the **"Fallback used"** request | "When Google couldn't serve this model, Attentra re-routed to OpenAI automatically. The user got an answer, and the cost was recorded on the model that actually ran." |
+| 3:15–4:15 | **Developer experience** | Terminal: `python demo.py` → then refresh History | "This is the official OpenAI SDK — two settings changed. `r.model` shows which model answered; the request is in History under the API key." |
+| 4:15–5:00 | **Trust & business model** | (talk) | "Keys are shown once and stored hashed; per-key rate limits and token caps. Pricing preview: usage plus 10% of savings measured against your baseline — not billed during the MVP." |
+
+---
+
+## 4. Safe Prompts
+
+Simple (routes to a low-cost model):
+- `Classify this support ticket as billing, bug or feature request: "I was charged twice this month."`
+- `Summarize in one sentence: <two-sentence paragraph>`
+
+Harder (should route to a stronger model; **rehearse first** to confirm the chosen model executes):
+- `Explain step by step why this Python function can deadlock when two threads call transfer() at the same time, and how to fix it.`
+
+Avoid: long essays, huge code outputs, personal data, anything needing tools or the web.
+
+---
+
+## 5. Developer Demo Script (`demo.py`)
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://attentra-nine.vercel.app/api/v1",
+    api_key=os.environ["ATTENTRA_API_KEY"],
+    max_retries=1,
+)
+
+r = client.chat.completions.create(
+    model="auto",
+    max_tokens=300,
+    messages=[{"role": "user", "content": "In two sentences: what does an AI gateway do?"}],
+)
+print("model:", r.model)
+print("tokens:", r.usage.total_tokens if r.usage else "n/a")
+print(r.choices[0].message.content)
 ```
 
-### Act 4 — Business Workspace (3:00–4:00)
-10. Navigate to `/business` (workspace switcher). Organization name is the real one everywhere.
-11. **Requests**: business API-key traffic attributed to the organization.
-12. **Billing** (`/business/billing`): walk the six cards — usage cost, verified savings, billable savings, **10% optimization fee**, customer net savings, total customer cost, plus coverage. Say: *"The fee applies to net savings for the period — negative-savings requests offset positive ones, and the fee is zero when we save nothing."*
+Set the key without showing it:
+```powershell
+$env:ATTENTRA_API_KEY = Read-Host "Attentra API key"
+python demo.py
+```
 
-### Act 5 — Close (4:00–4:30)
-13. Back to consumer **Billing** (`/billing`): same model, personal scope.
-14. Land the pitch: *"Transparent routing, verified savings, and a billing model aligned with the customer. That's Attentra."*
+---
 
-## 4. Safe Prompt Guidance
+## 6. If Something Fails
 
-Good demo prompts (small, fast, general):
-- `"Reply with exactly: routed."`
-- `"Summarize in one sentence: <two-sentence paragraph>."`
-- `"What is the capital of France? One word."`
+| Symptom | Cause | Response |
+|---|---|---|
+| 403 HTML / "Security Checkpoint" | Vercel DDoS mitigation on this network | Switch to the hotspot. Use the Playground (browsers pass the check). Play the backup recording |
+| `RateLimitError` / 429 | 20/min per key or 10/min Playground | Wait for `Retry-After`. Avoid repeated clicks |
+| `BadRequestError` with `param: "stream"` | `stream=True` used | Streaming is not supported yet. Remove it |
+| Slow first request | Cold start | Expected after idle; this is why we warm up |
+| Provider error after fallback | All attempts failed | Open the "Fallback used" History record instead and continue |
 
-Avoid: long essays, code generation with huge output, file analysis, anything needing tools/web, prompts with personal data.
+---
 
-## 5. If the Provider Call Fails (fallback talking points)
+## 7. What NOT to Do
 
-- **Timeout / provider error**: *"This is exactly what the fallback chain is for — the orchestrator retries on the next provider-diverse target. On this demo machine we'll retry once…"* (then retry).
-- **Repeated failure**: open an existing history item instead and present the persisted decision + cost intelligence — the audit story works fully offline.
-- **Slow (>20s)**: *"Provider latency varies by region; the request is still persisted and costed"* → move to Act 3.
-
-The persistence-gate design means a failed provider call never leaves the system without an audit record — that is itself a talking point.
-
-## 6. What NOT to Click
-
-- **Delete/revoke** actions on anything needed later (keys, members).
-- The email/password fields on `/login` — Google is the only live auth method.
-- Footer **Privacy/Terms** (static text), pricing-buy buttons on the landing page.
-- Any "invite member" flow that would email a stranger.
-
-## 7. Secret Hygiene During the Demo
-
-- Never open `.env`, `.env.local`, or the terminal history that shows provider keys.
-- The raw API key shown in Act 3 is one-time: demo with it, then **revoke it** after the demo.
-- If a key value appears on screen-share longer than intended, revoke it immediately — revocation is instant and part of the security story.
-- Never paste real keys into the chat/curl examples beyond the demo key.
+- Don't revoke or delete keys or members needed later.
+- Don't run loops or load tests against production (rate limits, Vercel DDoS mitigation).
+- Don't use `stream=True`.
+- Don't show `.env` files, terminal history with keys, or the Vercel dashboard environment variables.
+- If a key appears on screen-share, revoke it right after the demo.

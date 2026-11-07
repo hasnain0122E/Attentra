@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import Link from "next/link";
+
 import MetricCard from "@/components/dashboard/overview/MetricCard";
 import ModelActivity from "@/components/dashboard/overview/ModelActivity";
 import RecentRequests from "@/components/dashboard/overview/RecentRequests";
@@ -83,6 +85,39 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 function EmptyState() {
   return (
     <>
+      {/* First steps for a new account */}
+      <section className="rounded-2xl border border-[var(--color-accent)]/25 bg-[var(--color-accent-soft)] px-6 py-6">
+        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--color-accent)]">
+          Get started
+        </div>
+
+        <h2 className="mt-2 text-[17px] font-semibold tracking-[-0.015em] text-[var(--color-foreground)]">
+          Send your first routed request.
+        </h2>
+
+        <p className="mt-2 max-w-[560px] text-[12px] leading-5 text-[var(--color-foreground-secondary)]">
+          Try a prompt in the Playground to see which model Attentra picks and
+          why, or create an API key to call Attentra from your own code with
+          the OpenAI SDK.
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <Link
+            href="/dashboard/playground"
+            className="inline-flex items-center justify-center rounded-full bg-[var(--color-foreground)] px-5 py-2.5 text-[11px] font-medium text-white transition hover:opacity-90"
+          >
+            Open the Playground
+          </Link>
+
+          <Link
+            href="/dashboard/api-keys"
+            className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-2.5 text-[11px] font-medium text-[var(--color-foreground)] transition hover:border-[var(--color-border-strong)]"
+          >
+            Create an API key
+          </Link>
+        </div>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
           label="Requests"

@@ -9,34 +9,61 @@ import {
   Funnel,
   Gauge,
   Lightning,
+  ListMagnifyingGlass,
+  PaperPlaneTilt,
   Scan,
+  Sliders,
   Sparkle,
 } from "@phosphor-icons/react";
 
 const stages = [
   {
     number: "01",
-    label: "UNDERSTAND",
-    title: "Read the request",
+    label: "SEND",
+    title: "Send one request",
     description:
-      "Attentra analyzes what your application is asking for before choosing a model.",
-    icon: Scan,
+      'Point the official OpenAI SDK at Attentra and set model to "auto".',
+    icon: PaperPlaneTilt,
   },
   {
     number: "02",
-    label: "EVALUATE",
-    title: "Score the options",
+    label: "ANALYZE",
+    title: "Read the task",
     description:
-      "Every available model is evaluated against quality, latency, cost, and task requirements.",
-    icon: Funnel,
+      "Attentra estimates what kind of work it is — writing, coding, reasoning — and how complex.",
+    icon: Scan,
   },
   {
     number: "03",
-    label: "ROUTE",
-    title: "Choose the best fit",
+    label: "SCORE",
+    title: "Rank eligible models",
     description:
-      "Attentra selects the model that delivers the best outcome for that specific request.",
+      "Active models that support the task and fit the context are ranked under your policy.",
+    icon: Funnel,
+  },
+  {
+    number: "04",
+    label: "EXECUTE",
+    title: "Get the answer",
+    description:
+      "The top-ranked model's provider generates the response.",
+    icon: Lightning,
+  },
+  {
+    number: "05",
+    label: "RECOVER",
+    title: "Fall back if needed",
+    description:
+      "If that attempt fails with a recoverable error, the next eligible model — preferably on another provider — is tried.",
     icon: ArrowsClockwise,
+  },
+  {
+    number: "06",
+    label: "INSPECT",
+    title: "See why, and what it cost",
+    description:
+      "The decision, the model that actually answered, tokens and calculated cost are kept in History.",
+    icon: ListMagnifyingGlass,
   },
 ];
 
@@ -98,10 +125,10 @@ export default function HowItWorks() {
             }}
             className="mt-6 text-4xl font-semibold leading-[1.02] tracking-[-0.055em] text-[var(--color-foreground)] sm:text-5xl lg:text-6xl"
           >
-            One request.
+            Follow one request
             <br />
             <span className="text-[var(--color-accent)]">
-              A better decision.
+              through Attentra.
             </span>
           </motion.h2>
 
@@ -116,8 +143,8 @@ export default function HowItWorks() {
             }}
             className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[var(--color-foreground-secondary)] sm:text-lg"
           >
-            Your application sends one request to Attentra. The routing
-            layer handles the complexity of deciding what should happen next.
+            Six steps happen inside a single API call. None of them need
+            routing code in your application.
           </motion.p>
         </div>
 
@@ -126,60 +153,9 @@ export default function HowItWorks() {
             ===================================================== */}
 
         <div className="relative mx-auto mt-24 max-w-6xl lg:mt-28">
-          {/* DESKTOP CONNECTOR */}
-
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute left-[16.666%] right-[16.666%] top-[34px] hidden lg:block"
-          >
-            <div className="relative h-px w-full bg-[var(--color-border)]">
-              <motion.div
-                initial={{
-                  scaleX: 0,
-                  opacity: 0,
-                }}
-                whileInView={{
-                  scaleX: 1,
-                  opacity: 1,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.5,
-                }}
-                transition={{
-                  duration: 1.4,
-                  delay: 0.4,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="absolute inset-0 origin-left bg-[var(--color-accent)]"
-              />
-
-              <motion.div
-                initial={{
-                  left: "0%",
-                  opacity: 0,
-                }}
-                whileInView={{
-                  left: "100%",
-                  opacity: [0, 1, 1, 0],
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.5,
-                }}
-                transition={{
-                  duration: 1.7,
-                  delay: 0.9,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--color-accent)]"
-              />
-            </div>
-          </div>
-
           {/* STAGES */}
 
-          <div className="grid gap-16 lg:grid-cols-3 lg:gap-12">
+          <div className="grid gap-16 sm:grid-cols-2 sm:gap-x-10 sm:gap-y-14 lg:grid-cols-3 lg:gap-x-12">
             {stages.map((stage, index) => {
               const Icon = stage.icon;
 
@@ -260,7 +236,7 @@ export default function HowItWorks() {
                   {/* MOBILE CONNECTOR */}
 
                   {index < stages.length - 1 && (
-                    <div className="absolute -bottom-12 left-1/2 flex h-8 -translate-x-1/2 flex-col items-center lg:hidden">
+                    <div className="absolute -bottom-12 left-1/2 flex h-8 -translate-x-1/2 flex-col items-center sm:hidden">
                       <div className="h-full w-px bg-[var(--color-border)]" />
 
                       <motion.div
@@ -290,36 +266,6 @@ export default function HowItWorks() {
             })}
           </div>
         </div>
-
-        {/* =====================================================
-            SYSTEM STATUS
-            ===================================================== */}
-
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 15,
-          }}
-          whileInView={{
-            opacity: 1,
-            y: 0,
-          }}
-          viewport={{
-            once: true,
-            amount: 0.5,
-          }}
-          transition={{
-            duration: 0.6,
-            delay: 0.3,
-          }}
-          className="mx-auto mt-16 flex max-w-md items-center justify-center gap-3"
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] shadow-[0_0_8px_var(--color-success)]" />
-
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[var(--color-foreground-muted)]">
-            ROUTING DECISION ENGINE · ACTIVE
-          </span>
-        </motion.div>
 
         {/* =====================================================
             DECISION MATRIX
@@ -356,16 +302,17 @@ export default function HowItWorks() {
               </div>
 
               <div className="mt-6 text-[10px] font-semibold uppercase tracking-[0.13em] text-[var(--color-accent)]">
-                The decision layer
+                What the router weighs (step 03)
               </div>
 
               <h3 className="mt-3 max-w-md text-2xl font-semibold leading-tight tracking-[-0.04em] text-[var(--color-foreground)] sm:text-3xl">
-                Every request gets its own routing decision.
+                Four inputs. One explainable choice.
               </h3>
 
               <p className="mt-4 max-w-md text-sm leading-6 text-[var(--color-foreground-secondary)]">
-                Instead of hard-coding one model into your application,
-                Attentra evaluates the request dynamically.
+                No black box: the ranking and the reason come back with the
+                response. Latency and capability are model-profile estimates,
+                not live benchmarks.
               </p>
             </div>
 
@@ -374,27 +321,27 @@ export default function HowItWorks() {
             <div className="p-7 sm:p-10">
               <div className="grid gap-3 sm:grid-cols-2">
                 <DecisionFactor
-                  icon={<Gauge size={16} />}
-                  label="Latency"
-                  description="Prefer faster models when speed matters."
+                  icon={<CurrencyDollar size={16} />}
+                  label="Estimated cost"
+                  description="Current provider pricing × the request's estimated tokens."
                 />
 
                 <DecisionFactor
-                  icon={<CurrencyDollar size={16} />}
-                  label="Cost"
-                  description="Avoid paying premium prices for simple work."
+                  icon={<Gauge size={16} />}
+                  label="Latency estimate"
+                  description="Expected speed of each model family."
                 />
 
                 <DecisionFactor
                   icon={<Sparkle size={16} />}
-                  label="Quality"
-                  description="Use stronger models when complexity demands it."
+                  label="Capability"
+                  description="Model tier and task support, weighted up for complex work."
                 />
 
                 <DecisionFactor
-                  icon={<Lightning size={16} />}
-                  label="Task fit"
-                  description="Match the model to what the request actually needs."
+                  icon={<Sliders size={16} />}
+                  label="Your policy"
+                  description="balanced, cost_optimized, quality_first or speed_first shift the weights."
                 />
               </div>
 
@@ -407,11 +354,12 @@ export default function HowItWorks() {
 
                 <div>
                   <div className="text-xs font-semibold text-[var(--color-foreground)]">
-                    Optimized decision
+                    Explainable decision
                   </div>
 
                   <div className="mt-1 text-[11px] text-[var(--color-foreground-secondary)]">
-                    The best available model is selected automatically.
+                    The top-ranked eligible model is used, and the reason is
+                    returned with the response.
                   </div>
                 </div>
               </div>
@@ -442,18 +390,18 @@ export default function HowItWorks() {
           className="mt-16 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"
         >
           <p className="max-w-2xl text-xl font-medium tracking-[-0.025em] text-[var(--color-foreground)] sm:text-2xl">
-            Your application stays simple.
+            Want to see a decision change?
             <span className="text-[var(--color-foreground-muted)]">
               {" "}
-              Attentra handles the complexity behind it.
+              Try different tasks in the simulation below.
             </span>
           </p>
 
           <a
-            href="#architecture"
+            href="#product-demo"
             className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[var(--color-foreground)]"
           >
-            Explore the architecture
+            Open the simulation
 
             <ArrowRight
               size={16}

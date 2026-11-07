@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowRight,
@@ -13,34 +13,51 @@ import {
   TerminalWindow,
 } from "@phosphor-icons/react";
 
+// Official OpenAI JavaScript SDK — Attentra has no SDK of its own.
 const codeExamples = {
-  before: `const response = await openai.chat.completions.create({
+  before: `import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const response = await client.chat.completions.create({
   model: "gpt-4.1",
-  messages: messages
+  messages: [{ role: "user", content: "Summarize this ticket" }],
 });`,
 
-  after: `const response = await attentra.chat.completions.create({
-  messages: messages
-});`,
+  after: `import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.ATTENTRA_API_KEY,
+  baseURL: "https://attentra-nine.vercel.app/api/v1",
+});
+
+const response = await client.chat.completions.create({
+  model: "auto",
+  messages: [{ role: "user", content: "Summarize this ticket" }],
+});
+
+console.log(response.model, response.choices[0].message.content);`,
 };
 
 const routingModels = [
   {
     name: "Gemini Flash",
-    reason: "Low complexity · Fastest fit",
-    latency: "210ms",
+    reason: "Simple task · lowest estimated cost",
+    latency: "~210ms",
     cost: "$",
   },
   {
     name: "Claude Sonnet",
-    reason: "Balanced quality + reasoning",
-    latency: "480ms",
+    reason: "Writing task · balanced capability",
+    latency: "~480ms",
     cost: "$$",
   },
   {
     name: "GPT-4.1",
-    reason: "High complexity · Deep reasoning",
-    latency: "620ms",
+    reason: "Complex reasoning · strongest tier",
+    latency: "~620ms",
     cost: "$$$",
   },
 ];
@@ -49,26 +66,6 @@ export default function DeveloperIntegration() {
   const [copied, setCopied] = useState(false);
   const [showAfter, setShowAfter] = useState(true);
   const [activeModel, setActiveModel] = useState(0);
-
-  /*
-   * Simulated routing animation.
-   *
-   * Frontend-only demonstration of how
-   * Attentra can dynamically select a model.
-   */
-  useEffect(() => {
-    if (!showAfter) return;
-
-    const interval = window.setInterval(() => {
-      setActiveModel((current) => {
-        return (current + 1) % routingModels.length;
-      });
-    }, 2800);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [showAfter]);
 
   const copyCode = async () => {
     const code = showAfter
@@ -146,8 +143,8 @@ export default function DeveloperIntegration() {
             </div>
 
             <p className="mt-6 max-w-sm text-sm leading-6 text-white/60">
-              Keep your existing application architecture.
-              Add intelligent model routing at the API layer.
+              Already using the OpenAI SDK? Point it at Attentra and keep
+              the rest of your code.
             </p>
           </motion.div>
 
@@ -168,11 +165,11 @@ export default function DeveloperIntegration() {
               delay: 0.1,
             }}
             className="min-w-0 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-[-0.055em] text-white sm:text-5xl lg:text-6xl">
-            Add intelligent routing
+            Two settings to change.
             <br className="hidden sm:block" />
 
             <span className="text-[var(--color-accent)]">
-              without rebuilding your stack.
+              {" "}Same OpenAI SDK.
             </span>
           </motion.h2>
         </div>
@@ -234,13 +231,12 @@ export default function DeveloperIntegration() {
               </div>
 
 <h3 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
-  One small change.
+  What you need
 </h3>
 
               <p className="mt-4 max-w-sm text-sm leading-6 text-white/60">
-                Keep your prompts, application logic, and user
-                experience. Attentra becomes the intelligent layer
-                between your application and model providers.
+                An Attentra API key and the official OpenAI SDK. Your prompts
+                and messages stay exactly as they are.
               </p>
 
               {/* =================================================
@@ -250,21 +246,21 @@ export default function DeveloperIntegration() {
               <div className="mt-9 space-y-7">
                 <IntegrationStep
                   number="01"
-                  title="Connect your application"
-                  description="Use the Attentra API as your model endpoint."
+                  title="Create an API key"
+                  description="Sign in with Google, open API keys and copy the key — it is shown once."
                   active
                 />
 
                 <IntegrationStep
                   number="02"
-                  title="Send your request"
-                  description="Keep your existing prompts and messages."
+                  title="Change two settings"
+                  description="baseURL → https://attentra-nine.vercel.app/api/v1 and apiKey → your Attentra key."
                 />
 
                 <IntegrationStep
                   number="03"
-                  title="Let Attentra route it"
-                  description="The routing engine selects the best-fit model."
+                  title='Send model: "auto"'
+                  description="Attentra picks the model; response.model tells you which one answered."
                 />
               </div>
 
@@ -280,12 +276,13 @@ export default function DeveloperIntegration() {
 
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-white">
-                    Your application stays yours.
+                    Current MVP limits
                   </div>
 
                   <p className="mt-1 text-[10px] leading-5 text-white/60">
-                    Attentra sits between your application and
-                    the model providers.
+                    Non-streaming chat completions · max_tokens up to 4,096 ·
+                    20 requests/min per key. Streaming and tool calls are not
+                    supported yet.
                   </p>
                 </div>
               </div>
@@ -447,11 +444,11 @@ export default function DeveloperIntegration() {
                     <div className="flex min-w-0 items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-mono text-[7px] tracking-[0.12em] text-white/40">
-                          ATTENTRA ROUTING
+                          WHAT COMES BACK · EXAMPLE
                         </div>
 
                         <div className="mt-1 truncate text-xs font-medium text-white">
-                          Best-fit model selected
+                          The model chosen for this request
                         </div>
                       </div>
 
@@ -514,7 +511,7 @@ export default function DeveloperIntegration() {
                           />
                         }
                         value={selectedModel.latency}
-                        label="LATENCY"
+                        label="EST. LATENCY"
                       />
 
                       <ConsoleMetric
@@ -525,7 +522,7 @@ export default function DeveloperIntegration() {
                           />
                         }
                         value={selectedModel.cost}
-                        label="COST"
+                        label="RELATIVE COST"
                       />
 
                       <ConsoleMetric
@@ -535,8 +532,8 @@ export default function DeveloperIntegration() {
                             weight="duotone"
                           />
                         }
-                        value="FIT"
-                        label="DECISION"
+                        value="Included"
+                        label="ROUTING REASON"
                         className="hidden sm:flex"
                       />
                     </div>
@@ -605,7 +602,7 @@ export default function DeveloperIntegration() {
                       </div>
 
                       <div className="mt-1 truncate text-[10px] text-white/45">
-                        Application is locked to one model.
+                        Every request goes to the one model you hard-coded.
                       </div>
                     </div>
                   </motion.div>
@@ -615,44 +612,6 @@ export default function DeveloperIntegration() {
           </div>
         </motion.div>
 
-        {/* =========================================================
-            VALUE STRIP
-            ========================================================= */}
-
-        <div className="mt-6 grid min-w-0 gap-3 sm:mt-8 sm:grid-cols-3">
-          <Value
-            icon={
-              <TerminalWindow
-                size={16}
-                weight="duotone"
-              />
-            }
-            title="One API"
-            description="Integrate once and keep your application logic clean."
-          />
-
-          <Value
-            icon={
-              <Sparkle
-                size={16}
-                weight="duotone"
-              />
-            }
-            title="Multiple models"
-            description="Connect the models your workload actually needs."
-          />
-
-          <Value
-            icon={
-              <Lightning
-                size={16}
-                weight="duotone"
-              />
-            }
-            title="Intelligent routing"
-            description="Let Attentra handle model selection."
-          />
-        </div>
       </div>
     </section>
   );
@@ -733,36 +692,6 @@ function ConsoleMetric({
           {label}
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ===============================================================
-   VALUE
-   =============================================================== */
-
-function Value({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className=" min-w-0 rounded-2xl border border-[var(--color-dark-border)] bg-white/[0.03] p-5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
-        {icon}
-      </div>
-
-      <div className="mt-4 text-sm font-semibold text-white">
-        {title}
-      </div>
-
-      <p className="mt-1.5 text-xs leading-5 text-white/60">
-        {description}
-      </p>
     </div>
   );
 }

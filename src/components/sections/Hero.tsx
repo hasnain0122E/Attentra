@@ -64,7 +64,7 @@ export default function Hero() {
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
-              Intelligent LLM Routing
+              OpenAI-compatible AI gateway
             </span>
           </motion.div>
 
@@ -78,11 +78,14 @@ export default function Hero() {
               delay: 0.15,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="font-reservation uppercase text-5xl font-semibold leading-[0.98] tracking-[-0.045em] text-[var(--color-foreground)] sm:text-6xl lg:text-7xl xl:text-[5.5rem]"
+            className="font-reservation uppercase text-4xl font-semibold leading-[0.98] tracking-[-0.045em] text-[var(--color-foreground)] sm:text-6xl lg:text-7xl xl:text-[5.5rem]"
           >
-            Your AI doesn't need
+            <span className="sm:whitespace-nowrap">One API.</span>{" "}
+            <span className="sm:whitespace-nowrap">Many models.</span>
             <br />
-            <span className="text-[var(--color-accent)]">one model.</span>
+            <span className="sm:whitespace-nowrap text-[var(--color-accent)]">
+              Smarter routing.
+            </span>
           </motion.h1>
 
           {/* Description */}
@@ -97,8 +100,10 @@ export default function Hero() {
             }}
             className="attentra-body mx-auto mt-7 max-w-2xl text-lg sm:text-xl"
           >
-            Attentra automatically routes every AI request to the model that
-            best fits its complexity, quality requirements, latency, and cost.
+            Attentra sits between your app and OpenAI, Anthropic and Google.
+            For each request it weighs the task, its complexity and the
+            estimated cost, picks an eligible model, switches provider if one
+            fails — and shows you why.
           </motion.p>
 
           {/* =====================================================
@@ -118,10 +123,10 @@ export default function Hero() {
             {/* Primary CTA */}
 
             <a
-              href="#product"
+              href="/signup"
               className="group flex items-center gap-2 rounded-full bg-[var(--color-foreground)] px-6 py-3.5 text-sm font-medium text-white transition-transform duration-200 hover:-translate-y-0.5 hover:bg-[#202320]"
             >
-              Start routing
+              Get started free
               <ArrowRight
                 size={16}
                 className="transition-transform duration-200 group-hover:translate-x-1"
@@ -138,6 +143,15 @@ export default function Hero() {
               <CaretRight size={16} />
             </a>
           </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.65 }}
+            className="mt-5 text-xs text-[var(--color-foreground-muted)]"
+          >
+            Sign in with Google · Works with the official OpenAI SDK · Free MVP
+          </motion.p>
         </div>
 
         {/* =====================================================

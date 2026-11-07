@@ -5,54 +5,48 @@ import {
   ArrowRight,
   CheckCircle,
   CurrencyDollar,
-  Gauge,
-  GitBranch,
-  Lightning,
   Sparkle,
 } from "@phosphor-icons/react";
 
 const plans = [
   {
-    name: "Free Access",
-    eyebrow: "GET STARTED",
+    name: "MVP access",
+    eyebrow: "AVAILABLE NOW",
     description:
-      "Explore intelligent routing, inspect decisions, and validate savings — at no platform cost.",
-    priceDisplay: "PKR 0",
-    period: "/ month",
+      "Try the Playground, call the API with your own key, and see the routing decision and calculated cost of every request.",
+    priceDisplay: "Free",
+    period: "during the MVP",
     highlight: null as string | null,
     features: [
-      "Playground access",
-      "Intelligent model routing",
-      "Request history",
-      "Routing analytics",
-      "Cost intelligence",
-      "Baseline comparison",
-      "Model performance insights",
-      "No credit card required",
+      "Google sign-in",
+      "Playground with routing explanations",
+      "OpenAI-compatible API key",
+      "Request History",
+      "Calculated cost per request",
+      "Comparison with a baseline model",
+      "No credit card",
     ],
-    cta: "Start for free",
+    cta: "Get started free",
     href: "/signup",
     featured: false,
   },
   {
-    name: "Production API",
-    eyebrow: "PAY AS YOU GO",
+    name: "Production pricing",
+    eyebrow: "PREVIEW · NOT YET BILLED",
     description:
-      "Route production traffic through Attentra. Pay for your model usage plus 10% of the verified savings Attentra generates.",
+      "Planned model: pay for your model usage, plus 10% of the savings measured against a baseline model you choose. Payment collection is not live yet.",
     priceDisplay: null as string | null,
     period: null as string | null,
-    highlight: "10% of verified savings",
+    highlight: "10% of savings",
     features: [
-      "Production API access",
-      "API keys for workspace members",
-      "Multi-model intelligent routing",
-      "Automatic fallback execution",
-      "Usage and spend tracking",
-      "Business analytics dashboard",
-      "Cost optimization intelligence",
+      "Personal and business API keys",
+      "Automatic model routing",
+      "Cross-provider fallback",
+      "Usage and cost tracking",
+      "Business workspace dashboard",
       "Baseline cost comparison",
     ],
-    cta: "Start routing",
+    cta: "Try it free today",
     href: "/signup",
     featured: true,
   },
@@ -62,7 +56,7 @@ export default function Pricing() {
   return (
     <section
       id="pricing"
-      className="attentra-atmosphere attendra-atmosphere-medium relative isolate overflow-hidden bg-[var(--color-background)] py-24 sm:py-32 lg:py-40"
+      className="attentra-atmosphere attendra-atmosphere-medium relative isolate overflow-hidden bg-[var(--color-background)] pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40 lg:pb-20"
     >
       {/* =========================================================
           BACKGROUND ATMOSPHERE
@@ -105,7 +99,7 @@ export default function Pricing() {
             </span>
 
             <span className="attentra-label text-[var(--color-accent)]">
-              Performance-based pricing
+              Pricing preview
             </span>
           </motion.div>
 
@@ -127,10 +121,10 @@ export default function Pricing() {
             }}
             className="attentra-display mt-7 text-[var(--color-foreground)] sm:text-[3.25rem]"
           >
-            We make money when
+            We plan to earn only
             <br />
             <span className="text-[var(--color-accent)]">
-            we save you money.
+            when routing saves you money.
             </span>
           </motion.h2>
 
@@ -152,10 +146,10 @@ export default function Pricing() {
             }}
             className="attentra-body mx-auto mt-6 max-w-xl text-base sm:text-lg"
           >
-            Start free. Use Attentra&apos;s Playground, routing insights,
-            request history, and cost intelligence at no platform cost. When
-            you move production traffic through Attentra, pay for your model
-            usage plus 10% of the verified savings Attentra generates.
+            Attentra is free to try during the MVP. The planned model is
+            simple: you pay for model usage, plus a share of savings — only
+            when there are savings, and only once billing launches. No
+            payments are collected today.
           </motion.p>
         </div>
 
@@ -201,71 +195,31 @@ export default function Pricing() {
             </div>
 
             <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-[var(--color-accent)]">
-              How the optimization fee works
+              How the planned fee would work
             </span>
           </div>
 
           <div className="mt-5 grid gap-5 sm:grid-cols-3">
             <FormulaStep
               step="01"
-              title="Verified Savings"
-              description="Baseline cost minus your actual routed cost. Attentra measures every request."
+              title="Measured savings"
+              description="What a baseline model you choose would have cost for the same tokens, minus the actual routed cost. A per-request comparison, not a guarantee."
             />
 
             <FormulaStep
               step="02"
-              title="10% Optimization Fee"
-              description="Attentra charges 10% of positive verified savings only. If savings are zero or negative, the fee is PKR 0."
+              title="10% of positive savings"
+              description="If savings for the period are zero or negative, the fee is zero."
             />
 
             <FormulaStep
               step="03"
-              title="You Keep 90%"
-              description="Every rupee of verified savings beyond the fee stays with you. The more Attentra saves, the more you benefit."
+              title="You keep 90%"
+              description="Everything saved beyond the fee stays with you."
             />
           </div>
         </motion.div>
 
-        {/* =========================================================
-            VALUE STRIP
-            ========================================================= */}
-
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 18,
-          }}
-          whileInView={{
-            opacity: 1,
-            y: 0,
-          }}
-          viewport={{
-            once: true,
-          }}
-          transition={{
-            duration: 0.6,
-            delay: 0.3,
-          }}
-          className="mt-10 grid overflow-hidden rounded-[1.5rem] border border-[var(--color-border)] bg-white sm:grid-cols-3"
-        >
-          <Value
-            icon={<GitBranch size={15} />}
-            title="Model agnostic"
-            description="Route across the providers your application needs."
-          />
-
-          <Value
-            icon={<Gauge size={15} />}
-            title="Latency aware"
-            description="Keep fast requests on fast models."
-          />
-
-          <Value
-            icon={<Lightning size={15} />}
-            title="Automatic fallback"
-            description="If a provider fails, Attentra retries on the next best model."
-          />
-        </motion.div>
       </div>
     </section>
   );
@@ -339,7 +293,7 @@ function PricingCard({
 
           {plan.featured && (
             <span className="rounded-full bg-[var(--color-accent-soft)] px-2.5 py-1 font-mono text-[7px] tracking-[0.08em] text-[var(--color-accent)]">
-              RECOMMENDED
+              PREVIEW
             </span>
           )}
         </div>
@@ -360,10 +314,9 @@ function PricingCard({
               </div>
 
               <p className="mt-2 text-[10px] leading-4 text-[var(--color-foreground-muted)]">
-                Attentra&apos;s optimization fee applies only when Attentra
-                reduces your cost relative to your configured baseline. If
-                Attentra generates no positive savings, the optimization fee
-                is PKR 0.
+                Planned, not yet billed. The fee would apply only when routing
+                costs less than your baseline model; no positive savings, no
+                fee.
               </p>
             </div>
           ) : (
@@ -459,32 +412,3 @@ function FormulaStep({
   );
 }
 
-/* ===============================================================
-   VALUE ITEM
-   =============================================================== */
-
-function Value({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="min-w-0 border-[var(--color-border)] p-5 sm:p-6 sm:[&+div]:border-l">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-        {icon}
-      </div>
-
-      <div className="mt-4 text-xs font-semibold text-[var(--color-foreground)]">
-        {title}
-      </div>
-
-      <p className="mt-1.5 text-[10px] leading-5 text-[var(--color-foreground-secondary)]">
-        {description}
-      </p>
-    </div>
-  );
-}

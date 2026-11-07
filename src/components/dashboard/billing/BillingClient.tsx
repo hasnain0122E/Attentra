@@ -211,11 +211,16 @@ export default function BillingClient() {
           </div>
 
           <h1 className="mt-2 font-reservation text-[1.8rem] font-normal tracking-[-0.025em] text-[var(--color-foreground)]">
-            Pay for usage. We earn when we save you money.
+            Usage, cost and planned fees.
           </h1>
 
           <p className="mt-1 text-[11px] text-[var(--color-foreground-muted)]">
             {formatPeriodLabel(period.from, period.to)}
+          </p>
+          <p className="mt-2 max-w-[560px] text-[11px] leading-5 text-[var(--color-foreground-secondary)]">
+            Billing preview — no charges are collected during the MVP. Savings
+            compare actual cost with a baseline model: a calculation, not a
+            guarantee.
           </p>
         </div>
 
@@ -286,7 +291,7 @@ export default function BillingClient() {
             </p>
           </div>
 
-          {/* Verified savings */}
+          {/* Measured savings */}
           <div className="relative overflow-hidden bg-[var(--color-surface)] p-5 sm:p-6">
             <div
               aria-hidden="true"
@@ -301,7 +306,7 @@ export default function BillingClient() {
             <div className="relative">
               <div className="flex items-center justify-between gap-3">
                 <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--color-foreground-muted)]">
-                  Verified savings
+                  Measured savings
                 </div>
 
                 {hasPositiveSavings ? (
@@ -355,7 +360,7 @@ export default function BillingClient() {
 
             <p className="mt-3 text-[10px] leading-4 text-[var(--color-foreground-muted)]">
               {savings.optimizationFee > 0
-                ? `${formatPercentage(savings.optimizationFeeRate * 100)} of verified savings`
+                ? `${formatPercentage(savings.optimizationFeeRate * 100)} of measured savings`
                 : "No fee when savings are zero or negative"}
             </p>
           </div>
@@ -379,7 +384,7 @@ export default function BillingClient() {
 
             <p className="mt-3 text-[10px] leading-4 text-[var(--color-foreground-muted)]">
               {savings.customerNetSavings > 0
-                ? "90% of verified savings"
+                ? "90% of measured savings"
                 : "No net savings this period"}
             </p>
           </div>
@@ -416,7 +421,7 @@ export default function BillingClient() {
           </div>
 
           <h2 className="mt-2 font-reservation text-[1.3rem] font-normal tracking-[-0.025em] text-[var(--color-foreground)]">
-            10% of positive net verified savings
+            10% of positive net measured savings
           </h2>
         </div>
 
@@ -445,7 +450,7 @@ export default function BillingClient() {
               <div className="border-t border-[var(--color-border)] pt-3">
                 <div className="flex items-baseline justify-between">
                   <span className="text-[11px] font-medium text-[var(--color-foreground)]">
-                    = Verified savings
+                    = Measured savings
                   </span>
                   <span className="font-mono text-[11px] font-medium text-[var(--color-foreground)]">
                     {formatDisplayCurrency(savings.verifiedSavings)}
@@ -460,7 +465,7 @@ export default function BillingClient() {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between">
                 <span className="text-[11px] text-[var(--color-foreground-secondary)]">
-                  Verified savings
+                  Measured savings
                 </span>
                 <span className="font-mono text-[11px] text-[var(--color-foreground)]">
                   {formatDisplayCurrency(savings.billableSavings)}
@@ -494,8 +499,8 @@ export default function BillingClient() {
         <div className="border-t border-[var(--color-border)] px-5 py-4 sm:px-6">
           <p className="text-[10px] leading-4 text-[var(--color-foreground-muted)]">
             {savings.optimizationFee > 0
-              ? "Customer keeps 90% of positive verified savings."
-              : "No optimization fee is charged when the selected period does not produce positive verified savings."}
+              ? "Customer keeps 90% of positive measured savings."
+              : "No optimization fee is charged when the selected period does not produce positive measured savings."}
           </p>
         </div>
       </section>

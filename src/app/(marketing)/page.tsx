@@ -5,14 +5,17 @@ import  Hero  from '@/components/sections/Hero';
 import HowItWorks from "@/components/sections/HowItWorks";
 import Pricing from '@/components/sections/Pricing';
 import ModelFragmentation from "@/components/sections/ModelFragmentation";
-import Architecture from "@/components/sections/Architecture";
 import ProductDemo from "@/components/sections/ProductDemo";
 import WhyAttentra from "@/components/sections/WhyAttentra";
-import UseCases from "@/components/sections/UseCases";
 import DeveloperIntegration from "@/components/sections/DeveloperIntegration";
-import CostIntelligence from "@/components/sections/CostIntelligence";
 import FinalCTA from "@/components/sections/FinalCTA";
 
+/*
+ * Narrative — one job per section:
+ *   Hero (what is it) → ModelFragmentation (why) → HowItWorks (how) →
+ *   ProductDemo (example) → WhyAttentra (benefits) →
+ *   DeveloperIntegration (try it) → Pricing (business model) → FinalCTA.
+ */
 export default function Home() {
   return (
     <SmoothScroll>
@@ -21,11 +24,8 @@ export default function Home() {
         <Hero />
         <ModelFragmentation />
         <HowItWorks />
-        <Architecture />
         <ProductDemo />
         <WhyAttentra />
-        <UseCases />
-        <CostIntelligence />
         <DeveloperIntegration />
         <Pricing />
         <FinalCTA />

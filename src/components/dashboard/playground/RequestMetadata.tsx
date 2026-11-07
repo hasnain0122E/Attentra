@@ -6,9 +6,9 @@ interface RequestMetadataProps {
   result: PlaygroundResultData;
 }
 
-function formatCost(value: number | undefined) {
-  if (value === undefined) {
-    return "—";
+function formatCost(value: number | null | undefined) {
+  if (value == null) {
+    return "Not available";
   }
 
   // Canonical USD in, display-currency presentation out (product convention).

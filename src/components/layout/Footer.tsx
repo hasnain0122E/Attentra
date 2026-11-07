@@ -3,54 +3,23 @@
 import { motion } from "motion/react";
 import {
   ArrowUpRight,
-  GithubLogo,
-  LinkedinLogo,
-  Envelope,
 } from "@phosphor-icons/react";
 
 const productLinks = [
-  {
-    label: "Product demo",
-    href: "#product-demo",
-  },
-  {
-    label: "How it works",
-    href: "#how-it-works",
-  },
-  {
-    label: "Use cases",
-    href: "#use-cases",
-  },
-  {
-    label: "Pricing",
-    href: "#pricing",
-  },
+  { label: "Why routing", href: "#product" },
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Demo", href: "#product-demo" },
+  { label: "Benefits", href: "#why-attentra" },
 ];
 
 const developerLinks = [
-  {
-    label: "Architecture",
-    href: "#architecture",
-  },
-  {
-    label: "Developers",
-    href: "#developers",
-  },
-  {
-    label: "Cost intelligence",
-    href: "#cost-intelligence",
-  },
+  { label: "Quickstart", href: "#developers" },
+  { label: "Pricing preview", href: "#pricing" },
 ];
 
 const resourceLinks = [
-  {
-    label: "Why Attentra",
-    href: "#why-attentra",
-  },
-  {
-    label: "Get started",
-    href: "#get-started",
-  },
+  { label: "Get started", href: "/signup" },
+  { label: "Log in", href: "/login" },
 ];
 
 export default function Footer() {
@@ -109,31 +78,10 @@ export default function Footer() {
             </a>
 
             <p className="mt-5 max-w-xs text-sm leading-6 text-[var(--color-foreground-secondary)]">
-              Intelligent model routing for the modern AI stack.
-              Optimize quality, latency, and cost with every request.
+              An OpenAI-compatible gateway that routes each request across
+              OpenAI, Anthropic and Google — and shows you why.
             </p>
 
-            {/* Social / contact */}
-
-            <div className="mt-7 flex items-center gap-2">
-              <SocialLink
-                href="https://github.com"
-                label="GitHub"
-                icon={<GithubLogo size={14} />}
-              />
-
-              <SocialLink
-                href="https://linkedin.com"
-                label="LinkedIn"
-                icon={<LinkedinLogo size={14} />}
-              />
-
-              <SocialLink
-                href="mailto:hello@attentra.ai"
-                label="Email Attentra"
-                icon={<Envelope size={14} />}
-              />
-            </div>
           </motion.div>
 
           {/* =====================================================
@@ -268,31 +216,5 @@ function FooterColumn({
         ))}
       </nav>
     </motion.div>
-  );
-}
-
-/* ===============================================================
-   SOCIAL LINK
-   =============================================================== */
-
-function SocialLink({
-  href,
-  label,
-  icon,
-}: {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      target={href.startsWith("http") ? "_blank" : undefined}
-      rel={href.startsWith("http") ? "noreferrer" : undefined}
-      aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-white text-[var(--color-foreground-secondary)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-accent)]/30 hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
-    >
-      {icon}
-    </a>
   );
 }

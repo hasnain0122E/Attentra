@@ -5,40 +5,40 @@ import {
   ArrowRight,
   Brain,
   CheckCircle,
-  Code,
-  CurrencyDollar,
-  Gauge,
+  CloudSlash,
   Lightning,
   Stack,
+  WarningCircle,
 } from "@phosphor-icons/react";
 
-const models = [
+/** Three everyday requests that a single hard-coded model handles badly. */
+const examples = [
   {
-    name: "GPT-4.1",
-    provider: "OpenAI",
-    strength: "Deep reasoning",
-    cost: "$$$",
-    latency: "620ms",
+    request: "Classify a support ticket",
+    context: "Thousands a day",
+    needs: "A fast, inexpensive model",
+    hardCoded: "One premium model: you overpay on every call",
+    withAttentra: "Routed to a low-cost model that can do the job",
+    accent: "bg-[var(--color-accent)]",
+    icon: Lightning,
+  },
+  {
+    request: "Debug a production incident",
+    context: "A few a week",
+    needs: "Strong multi-step reasoning",
+    hardCoded: "One budget model: risk of a weak answer",
+    withAttentra: "Routed to a stronger reasoning model",
     accent: "bg-[var(--color-foreground)]",
     icon: Brain,
   },
   {
-    name: "Claude Sonnet",
-    provider: "Anthropic",
-    strength: "Complex analysis",
-    cost: "$$",
-    latency: "480ms",
-    accent: "bg-[var(--color-accent)]",
-    icon: Code,
-  },
-  {
-    name: "Gemini Flash",
-    provider: "Google",
-    strength: "Fast tasks",
-    cost: "$",
-    latency: "210ms",
-    accent: "bg-[var(--color-accent)]",
-    icon: Lightning,
+    request: "Your AI provider has an outage",
+    context: "Unplanned",
+    needs: "Another provider, ready to answer",
+    hardCoded: "One provider: requests fail until it recovers",
+    withAttentra: "Retried on an eligible model from another provider",
+    accent: "bg-[var(--color-foreground-secondary)]",
+    icon: CloudSlash,
   },
 ];
 
@@ -86,7 +86,7 @@ export default function ModelFragmentation() {
             </div>
 
             <h2 className="mt-6 max-w-xl text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-[var(--color-foreground)] sm:text-5xl lg:text-6xl">
-              One model was never meant to do everything.
+              Different requests need different models.
             </h2>
           </motion.div>
 
@@ -100,14 +100,15 @@ export default function ModelFragmentation() {
             className="lg:pt-10"
           >
             <p className="max-w-2xl text-lg leading-8 text-[var(--color-foreground-secondary)] sm:text-xl">
-              Every AI request has a different cost, latency, and intelligence
-              requirement. Sending everything to the same model means you're
-              constantly trading one for another.
+              A ticket classifier and a production bug hunt shouldn&apos;t pay
+              the same price — and when a provider goes down, an app wired to
+              that provider goes down with it.
             </p>
 
             <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--color-foreground-muted)]">
-              Attentra sits between your application and the model providers,
-              making that decision automatically.
+              Choosing per request and maintaining several provider
+              integrations is real engineering work, so most teams hard-code
+              one model and live with the trade-offs.
             </p>
           </motion.div>
         </div>
@@ -117,12 +118,12 @@ export default function ModelFragmentation() {
             ===================================================== */}
 
         <div className="mt-20 grid gap-4 md:grid-cols-3">
-          {models.map((model, index) => {
-            const ModelIcon = model.icon;
+          {examples.map((example, index) => {
+            const ExampleIcon = example.icon;
 
             return (
               <motion.div
-                key={model.name}
+                key={example.request}
                 initial={{
                   opacity: 0,
                   y: 30,
@@ -144,72 +145,64 @@ export default function ModelFragmentation() {
                 {/* Top accent */}
 
                 <div
-                  className={`absolute left-0 right-0 top-0 h-1 ${model.accent}`}
+                  className={`absolute left-0 right-0 top-0 h-1 ${example.accent}`}
                 />
 
                 {/* Header */}
 
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-base font-semibold text-[var(--color-foreground)]">
-                      {model.name}
+                      {example.request}
                     </div>
 
                     <div className="mt-1 text-xs text-[var(--color-foreground-muted)]">
-                      {model.provider}
+                      {example.context}
                     </div>
                   </div>
 
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-accent-soft)] text-[var(--color-accent)] transition-transform duration-300 group-hover:scale-105">
-                    <ModelIcon
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-accent-soft)] text-[var(--color-accent)] transition-transform duration-300 group-hover:scale-105">
+                    <ExampleIcon
                       size={25}
                       weight="duotone"
                     />
                   </div>
                 </div>
 
-                {/* Strength */}
+                {/* Need */}
 
                 <div className="mt-8">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-foreground-muted)]">
-                    Best at
+                    What it needs
                   </div>
 
                   <div className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[var(--color-foreground)]">
-                    {model.strength}
+                    {example.needs}
                   </div>
                 </div>
 
-                {/* Metrics */}
+                {/* Outcomes */}
 
-                <div className="mt-8 grid grid-cols-2 gap-3">
+                <div className="mt-8 grid gap-3">
                   <div className="rounded-xl bg-[var(--color-background)] p-3">
-                    <CurrencyDollar
-                      size={14}
-                      className="text-[var(--color-accent)]"
-                    />
-
-                    <div className="mt-3 text-[10px] uppercase tracking-wide text-[var(--color-foreground-muted)]">
-                      Relative cost
+                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--color-foreground-muted)]">
+                      <WarningCircle size={13} />
+                      Hard-coded
                     </div>
 
-                    <div className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">
-                      {model.cost}
+                    <div className="mt-1.5 text-sm text-[var(--color-foreground-secondary)]">
+                      {example.hardCoded}
                     </div>
                   </div>
 
-                  <div className="rounded-xl bg-[var(--color-background)] p-3">
-                    <Gauge
-                      size={14}
-                      className="text-[var(--color-accent)]"
-                    />
-
-                    <div className="mt-3 text-[10px] uppercase tracking-wide text-[var(--color-foreground-muted)]">
-                      Latency
+                  <div className="rounded-xl bg-[var(--color-accent-soft)] p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--color-accent)]">
+                      <CheckCircle size={13} />
+                      With Attentra
                     </div>
 
-                    <div className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">
-                      {model.latency}
+                    <div className="mt-1.5 text-sm font-medium text-[var(--color-foreground)]">
+                      {example.withAttentra}
                     </div>
                   </div>
                 </div>
@@ -219,73 +212,7 @@ export default function ModelFragmentation() {
         </div>
 
         {/* =====================================================
-            ATTENTRA VALUE STRIP
-            ===================================================== */}
-
-        <motion.div
-          initial={{ opacity: 0, y: 25 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.7 }}
-          className="mt-6 overflow-hidden rounded-[1.5rem] border border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-        >
-          <div className="grid md:grid-cols-[1fr_auto_1fr] md:items-center">
-            {/* Before */}
-
-            <div className="p-6 sm:p-8">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-foreground-muted)]">
-                Without Attentra
-              </div>
-
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[var(--color-foreground-muted)]">
-                  <Lightning size={17} />
-                </div>
-
-                <div>
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    One model for everything
-                  </div>
-
-                  <div className="mt-1 text-xs text-[var(--color-foreground-secondary)]">
-                    Expensive. Inflexible. Hard to optimize.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Divider */}
-
-            <div className="hidden h-16 w-px bg-[var(--color-accent)]/20 md:block" />
-
-            {/* After */}
-
-            <div className="border-t border-[var(--color-accent)]/20 p-6 sm:p-8 md:border-t-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-accent)]">
-                With Attentra
-              </div>
-
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent)] text-white">
-                  <CheckCircle size={17} />
-                </div>
-
-                <div>
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    The right model for every request
-                  </div>
-
-                  <div className="mt-1 text-xs text-[var(--color-foreground-secondary)]">
-                    Automatically optimized for your priorities.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* =====================================================
-            BOTTOM STATEMENT
+            BRIDGE TO HOW IT WORKS
             ===================================================== */}
 
         <motion.div
@@ -293,27 +220,21 @@ export default function ModelFragmentation() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.7 }}
-          className="mt-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"
+          className="mt-14 flex flex-col gap-5 rounded-[1.5rem] border border-[var(--color-accent)] bg-[var(--color-accent-soft)] p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8"
         >
-          <div>
-            <div className="attentra-label text-[var(--color-foreground-muted)]">
-              The Attentra advantage
-            </div>
-
-            <p className="mt-3 max-w-2xl text-2xl font-medium leading-tight tracking-[-0.03em] text-[var(--color-foreground)] sm:text-3xl">
-              Stop choosing a model.
-              <br />
-              <span className="text-[var(--color-accent)]">
-                Let your infrastructure choose.
-              </span>
-            </p>
-          </div>
+          <p className="max-w-2xl text-lg font-medium leading-7 tracking-[-0.02em] text-[var(--color-foreground)] sm:text-xl">
+            Attentra makes that choice on each request, outside your code
+            {" "}
+            <span className="text-[var(--color-foreground-secondary)]">
+              — and records why it chose.
+            </span>
+          </p>
 
           <a
             href="#how-it-works"
-            className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[var(--color-foreground)]"
+            className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform duration-200 hover:-translate-y-0.5"
           >
-            See how routing works
+            Follow one request
             <ArrowRight
               size={16}
               className="transition-transform duration-200 group-hover:translate-x-1"

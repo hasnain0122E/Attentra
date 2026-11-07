@@ -50,7 +50,12 @@ export default function ExecutionSummary({
 
       <SummaryItem
         label="Actual cost"
-        value={formatDisplayCurrency(execution.actualCost ?? 0)}
+        value={
+          // Unknown cost must not read as zero.
+          execution.actualCost == null
+            ? "Not available"
+            : formatDisplayCurrency(execution.actualCost)
+        }
         icon={Coins}
       />
 
