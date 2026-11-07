@@ -18,7 +18,7 @@ interface RequestRoutingOverviewProps {
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "\u2014";
+    return "Not available";
   }
 
   return formatDisplayCurrency(value);

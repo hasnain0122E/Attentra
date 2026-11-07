@@ -63,7 +63,7 @@ export function parseCandidateModels(
  *   - Routed model comes from RoutingDecision.selectedModelId
  *   - Executed model comes from Request.selectedModelId
  *   - fallbackUsed is inferred: routed model ≠ executed model
- *   - Attempts are synthesised (no per-attempt persistence yet)
+ *   - Attempts are reconstructed from routed/executed models only (no per-attempt persistence; no invented errors)
  *
  * This mapper is shared between consumer and business query layers.
  */
@@ -117,7 +117,11 @@ export function mapRequestToHistoryItem(
     status = "FAILED";
   }
 
-  // ── Synthesise attempts ───────────────────────────
+  // ── Reconstruct the known model path ──────────────
+  //
+  // Per-attempt results are not persisted (attempt logs are operator-only),
+  // so only the routed and executed models are known. Never invent error
+  // codes, messages, retryability or latencies for attempts.
   const attempts: HistoryExecutionAttempt[] = [];
 
   if (fallbackUsed) {
@@ -128,9 +132,6 @@ export function mapRequestToHistoryItem(
       provider: routedProvider,
       success: false,
       latencyMs: 0,
-      retryable: true,
-      errorCode: "EXECUTION_FAILED",
-      errorMessage: "Primary model execution failed.",
     });
 
     attempts.push({
@@ -150,24 +151,34 @@ export function mapRequestToHistoryItem(
       success: true,
       latencyMs: request.latencyMs ?? 0,
     });
-  } else {
+  } else if (request.status === "FAILED") {
     attempts.push({
       attempt: 1,
       model: routedModelName,
       modelIdentifier: routedModelIdentifier,
       provider: routedProvider,
       success: false,
-      latencyMs: request.latencyMs ?? 0,
-      retryable: false,
-      errorCode: "EXECUTION_FAILED",
-      errorMessage: "The provider did not return a successful completion.",
+      latencyMs: 0,
     });
   }
 
   // ── Costs ─────────────────────────────────────────
-  const actualCost = request.actualCost
-    ? Number(request.actualCost)
-    : undefined;
+  // A stored zero is a real zero; only null/undefined means "unknown".
+  const actualCost =
+    request.actualCost !== null && request.actualCost !== undefined
+      ? Number(request.actualCost)
+      : undefined;
+
+  // ── Token provenance ──────────────────────────────
+  // Request rows are created with routing-time token ESTIMATES; they are
+  // replaced by provider-reported usage only when post-execution cost
+  // persistence succeeds (which also stores actualCost).
+  const tokenSource: RequestHistoryItem["tokenSource"] =
+    request.status !== "SUCCESS"
+      ? "estimated"
+      : actualCost !== undefined
+        ? "reported"
+        : "unverified";
 
   return {
     id: request.id,
@@ -202,7 +213,10 @@ export function mapRequestToHistoryItem(
     executionLatencyMs: request.latencyMs ?? 0,
     latencyMs: request.latencyMs ?? 0,
 
+    tokenSource,
+
     attempts,
+    attemptsRecorded: false,
 
     createdAt: request.createdAt.toISOString(),
   };

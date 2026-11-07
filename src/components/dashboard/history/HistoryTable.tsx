@@ -13,6 +13,11 @@ import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
 import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
+import {
+  buildPromptPreview,
+  interpretStoredPrompt,
+} from "@/lib/dashboard/prompt-context";
+
 interface HistoryTableProps {
   requests: RequestHistoryItem[];
 }
@@ -27,7 +32,7 @@ function formatLatency(value: number) {
 
 function formatCost(value?: number) {
   if (value === undefined) {
-    return "\u2014";
+    return "Not available";
   }
 
   return formatDisplayCurrency(value);
@@ -94,9 +99,7 @@ export default function HistoryTable({
                   </span>
                 </div>
 
-                <p className="mt-3 line-clamp-2 max-w-[650px] text-[11px] font-medium leading-5 text-[var(--color-foreground)]">
-                  {request.prompt}
-                </p>
+                <PromptPreviewText prompt={request.prompt} />
 
                 <div className="mt-2 truncate font-mono text-[7px] tracking-[0.04em] text-[var(--color-foreground-muted)]">
                   {request.id}
@@ -169,7 +172,9 @@ export default function HistoryTable({
                 </div>
 
                 <div className="mt-1 font-mono text-[7px] text-[var(--color-foreground-muted)]">
-                  {request.totalTokens} tokens
+                  {request.tokenSource === "estimated"
+                    ? "Tokens not reported"
+                    : `${request.totalTokens} tokens`}
                 </div>
               </div>
 
@@ -184,6 +189,32 @@ export default function HistoryTable({
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * Latest user message (structured prompts) or the end of the stored user
+ * text (plain prompts). Rendered as text only; the full prompt stays
+ * available on the detail page.
+ */
+function PromptPreviewText({ prompt }: { prompt: string }) {
+  const preview = buildPromptPreview(interpretStoredPrompt(prompt));
+
+  return (
+    <>
+      <p
+        className="mt-3 line-clamp-2 max-w-[650px] break-words text-[11px] font-medium leading-5 text-[var(--color-foreground)]"
+        title={preview.truncated ? undefined : preview.text}
+      >
+        {preview.text}
+      </p>
+
+      {preview.caption && (
+        <div className="mt-1 font-mono text-[7px] uppercase tracking-[0.06em] text-[var(--color-foreground-muted)]">
+          {preview.caption}
+        </div>
+      )}
+    </>
   );
 }
 

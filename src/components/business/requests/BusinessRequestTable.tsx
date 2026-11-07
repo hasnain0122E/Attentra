@@ -13,6 +13,11 @@ import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-reques
 
 import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
+import {
+  buildPromptPreview,
+  interpretStoredPrompt,
+} from "@/lib/dashboard/prompt-context";
+
 interface BusinessRequestTableProps {
   requests: BusinessRequestHistoryItem[];
 }
@@ -120,8 +125,8 @@ export default function BusinessRequestTable({
               </div>
 
               {/* Prompt */}
-              <p className="mt-4 line-clamp-2 text-[10px] font-medium leading-5 text-[var(--color-foreground)]">
-                {request.prompt}
+              <p className="mt-4 line-clamp-2 break-words text-[10px] font-medium leading-5 text-[var(--color-foreground)]">
+                {buildPromptPreview(interpretStoredPrompt(request.prompt)).text}
               </p>
 
               <div className="mt-2 truncate font-mono text-[6px] tracking-[0.04em] text-[var(--color-foreground-muted)]">
@@ -163,9 +168,11 @@ export default function BusinessRequestTable({
 
                 <MobileMetric
                   label="Tokens"
-                  value={String(
-                    request.totalTokens,
-                  )}
+                  value={
+                    request.tokenSource === "estimated"
+                      ? "Not reported"
+                      : String(request.totalTokens)
+                  }
                 />
 
                 <MobileMetric
@@ -229,8 +236,10 @@ export default function BusinessRequestTable({
                   </span>
                 </div>
 
-                <p className="mt-3 line-clamp-2 text-[10px] font-medium leading-5 text-[var(--color-foreground)]">
-                  {request.prompt}
+                <p className="mt-3 line-clamp-2 break-words text-[10px] font-medium leading-5 text-[var(--color-foreground)]">
+
+                  {buildPromptPreview(interpretStoredPrompt(request.prompt)).text}
+
                 </p>
 
                 <div className="mt-2 truncate font-mono text-[6px] tracking-[0.04em] text-[var(--color-foreground-muted)]">
@@ -301,7 +310,9 @@ export default function BusinessRequestTable({
                 </div>
 
                 <div className="mt-1 font-mono text-[6px] text-[var(--color-foreground-muted)]">
-                  {request.totalTokens} tokens
+                  {request.tokenSource === "estimated"
+                    ? "Tokens not reported"
+                    : `${request.totalTokens} tokens`}
                 </div>
               </div>
 

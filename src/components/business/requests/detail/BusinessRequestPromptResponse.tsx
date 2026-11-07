@@ -13,6 +13,8 @@ import {
 
 import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-request-queries";
 
+import RequestConversationContext from "@/components/dashboard/history/detail/RequestConversationContext";
+
 interface BusinessRequestPromptResponseProps {
   request: BusinessRequestHistoryItem;
 }
@@ -58,18 +60,8 @@ export default function BusinessRequestPromptResponse({
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
-          <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--color-foreground-muted)]">
-            User prompt
-          </div>
-
-          <div className="mt-5 rounded-2xl bg-[var(--color-background)] p-4 sm:p-5">
-            <p className="whitespace-pre-wrap text-[11px] leading-6 text-[var(--color-foreground)]">
-              {request.prompt}
-            </p>
-          </div>
-        </article>
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <RequestConversationContext prompt={request.prompt} />
 
         <article className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
           <div className="flex items-center justify-between gap-4">

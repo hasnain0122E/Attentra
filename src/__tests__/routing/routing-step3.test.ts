@@ -183,8 +183,8 @@ function setupTransactionMock() {
       findUnique: mockDecisionFindUnique,
     },
   };
-  mockTransaction.mockImplementation(async (fn: (tx: typeof mockTx) => Promise<void>) => {
-    await fn(mockTx);
+  mockTransaction.mockImplementation(async (fn: (tx: typeof mockTx) => Promise<unknown>) => {
+    return fn(mockTx);
   });
   return mockTx;
 }
@@ -197,76 +197,67 @@ beforeEach(() => {
 // 1. PERSISTENCE
 // ─────────────────────────────────────────────────────
 
-describe("Persistence — persistRoutingDecision", () => {
-  it("saves decision successfully and returns decisionId", async () => {
+describe("Persistence — persistRoutingDecision (create-only)", () => {
+  it("creates the Request and RoutingDecision and returns the new decisionId", async () => {
     const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "req-1" }); // Request exists
-    mockDecisionUpsert.mockResolvedValue({ id: "dec-1" });
-    mockDecisionFindUnique.mockResolvedValue({ id: "dec-1" });
+    mockDecisionCreate.mockResolvedValue({ id: "dec-1" });
 
     const result = await persistRoutingDecision("req-1", makeDecision());
 
     expect(result.success).toBe(true);
     expect(result.decisionId).toBe("dec-1");
     expect(mockTransaction).toHaveBeenCalledTimes(1);
-    expect(mockFindUnique).toHaveBeenCalledWith({ where: { id: "req-1" } });
-    expect(mockDecisionUpsert).toHaveBeenCalledTimes(1);
+    expect(mockTx.request.create).toHaveBeenCalledTimes(1);
+    expect(mockDecisionCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("creates Request record when it does not exist", async () => {
+  it("creates a PENDING Request with routing metadata and no owner", async () => {
     const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue(null); // Request doesn't exist
-    mockDecisionUpsert.mockResolvedValue({});
-    mockDecisionFindUnique.mockResolvedValue({ id: "dec-2" });
+    mockDecisionCreate.mockResolvedValue({ id: "dec-2" });
 
     const decision = makeDecision();
     const result = await persistRoutingDecision("new-req", decision);
 
     expect(result.success).toBe(true);
-    expect(mockTx.request.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          id: "new-req",
-          status: "PENDING",
-          taskType: "GENERAL",
-          complexity: "LOW",
-          selectedModelId: decision.selected.candidate.modelId,
-          selectedProviderId: decision.selected.candidate.providerId,
-        }),
-      })
-    );
+    const data = mockTx.request.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      id: "new-req",
+      status: "PENDING",
+      taskType: "GENERAL",
+      complexity: "LOW",
+      selectedModelId: decision.selected.candidate.modelId,
+      selectedProviderId: decision.selected.candidate.providerId,
+    });
+    expect(data.userId).toBeUndefined();
+    expect(data.businessId).toBeUndefined();
+    expect(data.apiKeyId).toBeUndefined();
   });
 
-  it("does NOT create Request when it already exists", async () => {
-    const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "existing-req" });
-    mockDecisionUpsert.mockResolvedValue({});
-    mockDecisionFindUnique.mockResolvedValue({ id: "dec-3" });
+  it("never looks up, reuses, updates or upserts an existing Request/decision", async () => {
+    setupTransactionMock();
+    mockDecisionCreate.mockResolvedValue({ id: "dec-3" });
 
-    await persistRoutingDecision("existing-req", makeDecision());
+    await persistRoutingDecision("some-req", makeDecision());
 
-    expect(mockTx.request.create).not.toHaveBeenCalled();
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockRequestUpsert).not.toHaveBeenCalled();
+    expect(mockDecisionUpsert).not.toHaveBeenCalled();
+    expect(mockDecisionFindUnique).not.toHaveBeenCalled();
   });
 
-  it("handles duplicate requestId via upsert (update instead of create)", async () => {
+  it("fails safely (no overwrite) when the requestId already exists", async () => {
     const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "dup-req" });
-    mockDecisionUpsert.mockResolvedValue({ id: "existing-dec" });
-    mockDecisionFindUnique.mockResolvedValue({ id: "existing-dec" });
+    const duplicate = Object.assign(new Error("Unique constraint failed on the fields: (`id`)"), {
+      code: "P2002",
+    });
+    mockTx.request.create.mockRejectedValue(duplicate);
 
-    const result = await persistRoutingDecision("dup-req", makeDecision());
+    const result = await persistRoutingDecision("victim-req", makeDecision());
 
-    expect(result.success).toBe(true);
-    expect(result.decisionId).toBe("existing-dec");
-    // upsert called with both create and update branches
-    expect(mockDecisionUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { requestId: "dup-req" },
-      })
-    );
-    const upsertArg = mockDecisionUpsert.mock.calls[0][0];
-    expect(upsertArg.create).toBeDefined();
-    expect(upsertArg.update).toBeDefined();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Persistence failed");
+    expect(mockDecisionCreate).not.toHaveBeenCalled();
+    expect(mockDecisionUpsert).not.toHaveBeenCalled();
   });
 
   it("returns error on empty requestId", async () => {
@@ -293,10 +284,8 @@ describe("Persistence — persistRoutingDecision", () => {
   });
 
   it("includes candidate data in RoutingDecision JSON", async () => {
-    const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "req-json" });
-    mockDecisionUpsert.mockResolvedValue({});
-    mockDecisionFindUnique.mockResolvedValue({ id: "dec-json" });
+    setupTransactionMock();
+    mockDecisionCreate.mockResolvedValue({ id: "dec-json" });
 
     const candidate1 = makeCandidate({ modelId: "c1", displayName: "Model A" });
     const candidate2 = makeCandidate({ modelId: "c2", displayName: "Model B", providerId: "prov-b" });
@@ -315,10 +304,10 @@ describe("Persistence — persistRoutingDecision", () => {
 
     await persistRoutingDecision("req-json", decision);
 
-    const upsertArg = mockDecisionUpsert.mock.calls[0][0];
-    const candidateModels = upsertArg.create.candidateModels;
+    const createArg = mockDecisionCreate.mock.calls[0][0];
+    expect(createArg.data.requestId).toBe("req-json");
+    const candidateModels = createArg.data.candidateModels;
 
-    // Verify scored candidates
     expect(candidateModels.scored).toHaveLength(2);
     expect(candidateModels.scored[0]).toMatchObject({
       modelId: "c1",
@@ -330,7 +319,6 @@ describe("Persistence — persistRoutingDecision", () => {
       providerId: "prov-b",
     });
 
-    // Verify rejected candidates
     expect(candidateModels.rejected).toHaveLength(1);
     expect(candidateModels.rejected[0]).toMatchObject({
       modelId: "c3",
@@ -339,26 +327,21 @@ describe("Persistence — persistRoutingDecision", () => {
   });
 
   it("persists score with correct precision", async () => {
-    const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "req-score" });
-    mockDecisionUpsert.mockResolvedValue({});
-    mockDecisionFindUnique.mockResolvedValue({ id: "dec-score" });
+    setupTransactionMock();
+    mockDecisionCreate.mockResolvedValue({ id: "dec-score" });
 
     const score = makeScore(makeCandidate(), 0.8543);
     const decision = makeDecision({ selected: score, candidates: [score] });
 
     await persistRoutingDecision("req-score", decision);
 
-    const upsertArg = mockDecisionUpsert.mock.calls[0][0];
-    // Score should be passed as a Decimal-compatible value
-    expect(upsertArg.create.score).toBeDefined();
+    const createArg = mockDecisionCreate.mock.calls[0][0];
+    expect(createArg.data.score).toBeDefined();
   });
 
   it("passes taskType and complexity to RoutingDecision", async () => {
-    const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "req-meta" });
-    mockDecisionUpsert.mockResolvedValue({});
-    mockDecisionFindUnique.mockResolvedValue({ id: "dec-meta" });
+    setupTransactionMock();
+    mockDecisionCreate.mockResolvedValue({ id: "dec-meta" });
 
     const decision = makeDecision({
       taskType: "CODING",
@@ -367,9 +350,9 @@ describe("Persistence — persistRoutingDecision", () => {
 
     await persistRoutingDecision("req-meta", decision);
 
-    const upsertArg = mockDecisionUpsert.mock.calls[0][0];
-    expect(upsertArg.create.taskType).toBe("CODING");
-    expect(upsertArg.create.complexity).toBe("HIGH");
+    const createArg = mockDecisionCreate.mock.calls[0][0];
+    expect(createArg.data.taskType).toBe("CODING");
+    expect(createArg.data.complexity).toBe("HIGH");
   });
 });
 
@@ -387,10 +370,8 @@ describe("routeAndPersist — with mocked database", () => {
   });
 
   it("routes and persists successfully with requestId", async () => {
-    const mockTx = setupTransactionMock();
-    mockFindUnique.mockResolvedValue({ id: "test-req-1" });
-    mockDecisionUpsert.mockResolvedValue({});
-    mockDecisionFindUnique.mockResolvedValue({ id: "persisted-dec-1" });
+    setupTransactionMock();
+    mockDecisionCreate.mockResolvedValue({ id: "persisted-dec-1" });
 
     const result = await routeAndPersist({
       messages: [{ role: "user", content: "Hello, how are you?" }],

@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, List, X } from "@phosphor-icons/react";
 import Image from "next/image";
+import Link from "next/link";
 const navItems = [
   { label: "How it works", href: "#how-it-works" },
   { label: "Demo", href: "#product-demo" },
   { label: "Benefits", href: "#why-attentra" },
   { label: "Pricing", href: "#pricing" },
-  { label: "Docs", href: "#developers" },
+  { label: "Docs", href: "/docs" },
 ];
 
 export default function Navbar() {
@@ -101,15 +102,20 @@ export default function Navbar() {
               ===================================================== */}
 
           <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
-            {navItems.map((item) => (
-              <a
-                key={item.label}
-                href={item.href}
-                className="rounded-full px-4 py-2 text-[13px] font-medium text-[var(--color-foreground-secondary)] transition-colors hover:bg-[var(--color-surface-soft)] hover:text-[var(--color-foreground)]"
-              >
-                {item.label}
-              </a>
-            ))}
+            {navItems.map((item) => {
+              const className =
+                "rounded-full px-4 py-2 text-[13px] font-medium text-[var(--color-foreground-secondary)] transition-colors hover:bg-[var(--color-surface-soft)] hover:text-[var(--color-foreground)]";
+              // Routes (e.g. /docs) use Next.js Link; in-page sections use anchors.
+              return item.href.startsWith("/") ? (
+                <Link key={item.label} href={item.href} className={className}>
+                  {item.label}
+                </Link>
+              ) : (
+                <a key={item.label} href={item.href} className={className}>
+                  {item.label}
+                </a>
+              );
+            })}
           </nav>
 
           {/* =====================================================
@@ -189,16 +195,19 @@ export default function Navbar() {
           >
             <div className="attentra-container rounded-3xl border border-[var(--color-border)] bg-white p-3 shadow-[var(--shadow-lg)]">
               <nav className="flex flex-col">
-                {navItems.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    onClick={closeMobile}
-                    className="rounded-2xl px-4 py-3.5 text-sm font-medium text-[var(--color-foreground-secondary)] transition-colors hover:bg-[var(--color-surface-soft)] hover:text-[var(--color-foreground)]"
-                  >
-                    {item.label}
-                  </a>
-                ))}
+                {navItems.map((item) => {
+                  const className =
+                    "rounded-2xl px-4 py-3.5 text-sm font-medium text-[var(--color-foreground-secondary)] transition-colors hover:bg-[var(--color-surface-soft)] hover:text-[var(--color-foreground)]";
+                  return item.href.startsWith("/") ? (
+                    <Link key={item.label} href={item.href} onClick={closeMobile} className={className}>
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <a key={item.label} href={item.href} onClick={closeMobile} className={className}>
+                      {item.label}
+                    </a>
+                  );
+                })}
 
                 <a
                   href="/login"

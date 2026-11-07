@@ -84,10 +84,10 @@ export interface PersistedRejectionData {
 /**
  * Persist a routing decision to the database.
  *
- * Creates or updates a RoutingDecision record linked to the given Request.
- * Uses a Prisma transaction to:
- * 1. Ensure the associated Request record exists (creates if missing)
- * 2. Upsert the RoutingDecision (handles duplicate protection via requestId @unique)
+ * Creates a NEW Request and its RoutingDecision in one transaction.
+ * The requestId must be server-generated and unused: an existing id is a
+ * hard failure (never reused or overwritten) — see the P0 request-ID
+ * ownership hotfix (docs/PHASE_3C_REQUEST_ID_SECURITY_HOTFIX.md).
  *
  * Immutability / Auditability:
  *   A persisted RoutingDecision represents a point-in-time routing snapshot.
@@ -96,11 +96,9 @@ export interface PersistedRejectionData {
  *   all rejected candidates with reasons. This snapshot preserves the full
  *   audit trail even if pricing changes later.
  *
- *   The upsert pattern provides idempotent persistence. Re-routing the same
- *   requestId intentionally overwrites the previous decision — this represents
- *   an explicit new routing decision, NOT an automatic pricing update.
- *   Pricing changes from Phase 5 sync do NOT trigger re-routing; only an
- *   explicit call to routeAndPersist() creates or updates a decision.
+ *   Decisions are write-once: re-using a requestId fails instead of
+ *   overwriting. Pricing changes from Phase 5 sync do NOT trigger
+ *   re-routing; only an explicit call to routeAndPersist() creates a decision.
  *
  *   Historical pricing is preserved in PricingSnapshot.effectiveTo records,
  *   ensuring that past pricing remains available for audit even when active
@@ -121,28 +119,28 @@ export async function persistRoutingDecision(
 
     const candidateData = buildCandidateData(decision);
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Ensure Request exists
-      const existing = await tx.request.findUnique({ where: { id: requestId } });
-      if (!existing) {
-        await tx.request.create({
-          data: {
-            id: requestId,
-            status: "PENDING",
-            taskType: decision.taskType,
-            complexity: decision.complexity.complexity as "LOW" | "MEDIUM" | "HIGH",
-            inputTokens: decision.tokenEstimate.inputTokens,
-            outputTokens: decision.tokenEstimate.outputTokens,
-            selectedModelId: decision.selected.candidate.modelId,
-            selectedProviderId: decision.selected.candidate.providerId,
-          },
-        });
-      }
+    // Create-only (P0 hotfix). The Request and its RoutingDecision are
+    // always NEW rows. An existing Request is never looked up, reused or
+    // overwritten: a duplicate id fails atomically on the primary key /
+    // requestId unique constraint (P2002) and the transaction rolls back,
+    // so another request's ownership, prompt, response, usage or routing
+    // decision can never be modified here. No check-then-write race.
+    const decisionId = await prisma.$transaction(async (tx) => {
+      await tx.request.create({
+        data: {
+          id: requestId,
+          status: "PENDING",
+          taskType: decision.taskType,
+          complexity: decision.complexity.complexity as "LOW" | "MEDIUM" | "HIGH",
+          inputTokens: decision.tokenEstimate.inputTokens,
+          outputTokens: decision.tokenEstimate.outputTokens,
+          selectedModelId: decision.selected.candidate.modelId,
+          selectedProviderId: decision.selected.candidate.providerId,
+        },
+      });
 
-      // 2. Create or update RoutingDecision (upsert handles duplicate requestId)
-      await tx.routingDecision.upsert({
-        where: { requestId },
-        create: {
+      const created = await tx.routingDecision.create({
+        data: {
           requestId,
           taskType: decision.taskType,
           complexity: decision.complexity.complexity as "LOW" | "MEDIUM" | "HIGH",
@@ -151,26 +149,15 @@ export async function persistRoutingDecision(
           score: new Decimal(decision.selected.score.toFixed(4)),
           reason: decision.reason,
         },
-        update: {
-          taskType: decision.taskType,
-          complexity: decision.complexity.complexity as "LOW" | "MEDIUM" | "HIGH",
-          candidateModels: candidateData,
-          selectedModelId: decision.selected.candidate.modelId,
-          score: new Decimal(decision.selected.score.toFixed(4)),
-          reason: decision.reason,
-        },
+        select: { id: true },
       });
-    });
 
-    // Query the created/updated decision to return its ID
-    const saved = await prisma.routingDecision.findUnique({
-      where: { requestId },
-      select: { id: true },
+      return created.id;
     });
 
     return {
       success: true,
-      decisionId: saved?.id,
+      decisionId,
     };
   } catch (error) {
     return {

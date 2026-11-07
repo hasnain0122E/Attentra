@@ -9,6 +9,8 @@ import {
 
 import type { RequestHistoryItem } from "@/lib/dashboard/history-data";
 
+import RequestConversationContext from "./RequestConversationContext";
+
 interface RequestPromptResponseProps {
   request: RequestHistoryItem;
 }
@@ -35,19 +37,9 @@ export default function RequestPromptResponse({
   }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-2">
-      {/* Prompt */}
-      <article className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
-        <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-[var(--color-foreground-muted)]">
-          User prompt
-        </div>
-
-        <div className="mt-5 rounded-2xl bg-[var(--color-background)] p-4 sm:p-5">
-          <p className="whitespace-pre-wrap text-[11px] leading-6 text-[var(--color-foreground)]">
-            {request.prompt}
-          </p>
-        </div>
-      </article>
+    <section className="grid items-start gap-4 xl:grid-cols-2">
+      {/* Conversation context (prompt) */}
+      <RequestConversationContext prompt={request.prompt} />
 
       {/* Response */}
       <article className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
@@ -82,7 +74,7 @@ export default function RequestPromptResponse({
 
         <div className="mt-5 rounded-2xl bg-[var(--color-accent-soft)]/50 p-4 sm:p-5">
           {request.response ? (
-            <p className="whitespace-pre-wrap text-[11px] leading-6 text-[var(--color-foreground)]">
+            <p className="whitespace-pre-wrap break-words text-[11px] leading-6 text-[var(--color-foreground)]">
               {request.response}
             </p>
           ) : (

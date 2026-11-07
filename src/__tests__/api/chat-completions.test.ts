@@ -34,6 +34,16 @@ import type { ExecutionPlan } from "@/lib/routing/execution-plan";
 // HOISTED MOCKS
 // ─────────────────────────────────────────────────────
 
+// P0 request-ID hotfix: persistence IDs are always server-generated and
+// ownership is attached only to an unowned row.
+const SERVER_ID = expect.stringMatching(/^req_\d+_[a-z0-9]{8}$/);
+const UNOWNED_WHERE = {
+  id: SERVER_ID,
+  userId: null,
+  businessId: null,
+  apiKeyId: null,
+};
+
 const {
   mockResolveRequester,
   mockRouteAndPersist,
@@ -445,7 +455,7 @@ describe("Chat Completions API — Validation", () => {
 // ─────────────────────────────────────────────────────
 
 describe("Chat Completions API — Request ID", () => {
-  it("preserves client-supplied requestId", async () => {
+  it("ignores client-supplied requestId (server-generated ID only)", async () => {
     mockRouteAndPersist.mockResolvedValue({
       success: false,
       error: "No models",
@@ -460,9 +470,8 @@ describe("Chat Completions API — Request ID", () => {
     const res = await POST(req);
     const data = await parseJson(res);
 
-    expect(data.requestId).toBe(
-      "client-req-123",
-    );
+    expect(data.requestId).not.toBe("client-req-123");
+    expect(data.requestId).toEqual(SERVER_ID);
   });
 
   it("generates requestId when none is provided", async () => {
@@ -544,9 +553,7 @@ describe("Chat Completions API — Consumer Ownership", () => {
     expect(
       mockRequestUpdate,
     ).toHaveBeenCalledWith({
-      where: {
-        id: "ownership-test",
-      },
+      where: UNOWNED_WHERE,
 
       data: {
         userId: "test-user-id",
@@ -609,7 +616,7 @@ describe("Chat Completions API — Consumer Ownership", () => {
     expect(
       mockRequestUpdate,
     ).toHaveBeenCalledWith({
-      where: { id: "apikey-ownership" },
+      where: UNOWNED_WHERE,
       data: {
         businessId: "biz-42",
         apiKeyId: "key-7",
@@ -687,7 +694,7 @@ describe("Chat Completions API — Consumer Ownership", () => {
     await POST(req);
 
     expect(mockRequestUpdate).toHaveBeenCalledWith({
-      where: { id: "personal-key-ownership" },
+      where: UNOWNED_WHERE,
       data: {
         userId: "user-42",
         businessId: null,
@@ -740,7 +747,7 @@ describe("Chat Completions API — Consumer Ownership", () => {
 
     // Ownership MUST still be attached because persisted.success is true
     expect(mockRequestUpdate).toHaveBeenCalledWith({
-      where: { id: "no-decision-id-test" },
+      where: UNOWNED_WHERE,
       data: {
         userId: "test-user-id",
       },
@@ -858,7 +865,9 @@ describe("Chat Completions API — API Key Auth", () => {
     expect(res.status).toBe(200);
     const data = await parseJson(res);
     expect(data.success).toBe(true);
-    expect(data.requestId).toBe("full-pipeline-apikey");
+    // Client-supplied requestId is ignored; the ID is server-generated.
+    expect(data.requestId).toEqual(SERVER_ID);
+    expect(data.requestId).not.toBe("full-pipeline-apikey");
     expect(data.content).toBe("Routed and executed via API key");
 
     expect(mockRouteAndPersist).toHaveBeenCalled();
@@ -936,9 +945,8 @@ describe("Chat Completions API — Execution", () => {
 
     expect(data.success).toBe(true);
 
-    expect(data.requestId).toBe(
-      "success-test",
-    );
+    expect(data.requestId).toEqual(SERVER_ID);
+    expect(data.id).toBe(data.requestId);
 
     expect(data.content).toBe(
       "Hello from Attentra!",
@@ -1096,7 +1104,7 @@ describe("Chat Completions API — Execution", () => {
     ).toHaveBeenCalledWith(
       expect.anything(),
       {
-        requestId: "cost-test",
+        requestId: SERVER_ID,
 
         executedModelId:
           "executed-model",
@@ -1760,7 +1768,7 @@ describe("Chat Completions API — Persistence Reliability Gate", () => {
 
     // Verify ownership: userId set, businessId null, apiKeyId set
     expect(mockRequestUpdate).toHaveBeenCalledWith({
-      where: { id: "personal-key-test" },
+      where: UNOWNED_WHERE,
       data: {
         userId: "user-42",
         businessId: null,
@@ -1815,7 +1823,7 @@ describe("Chat Completions API — Persistence Reliability Gate", () => {
 
     // Verify ownership: userId null, businessId set, apiKeyId set
     expect(mockRequestUpdate).toHaveBeenCalledWith({
-      where: { id: "biz-key-test" },
+      where: UNOWNED_WHERE,
       data: {
         businessId: "biz-99",
         apiKeyId: "biz-key-5",
@@ -1870,7 +1878,7 @@ describe("Chat Completions API — Persistence Reliability Gate", () => {
 
     // Verify ownership: only userId set
     expect(mockRequestUpdate).toHaveBeenCalledWith({
-      where: { id: "session-test" },
+      where: UNOWNED_WHERE,
       data: {
         userId: "session-user-1",
       },

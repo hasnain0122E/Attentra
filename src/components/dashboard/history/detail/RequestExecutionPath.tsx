@@ -35,17 +35,28 @@ export default function RequestExecutionPath({
           </div>
 
           <h2 className="mt-1.5 text-[16px] font-semibold tracking-[-0.015em] text-[var(--color-foreground)]">
-            Provider execution attempts
+            {request.attemptsRecorded === false
+              ? "Routed and executed models"
+              : "Provider execution attempts"}
           </h2>
         </div>
 
         {request.fallbackUsed && (
           <div className="flex w-fit items-center gap-1.5 rounded-full bg-[var(--color-accent-soft)] px-3 py-1.5 font-mono text-[8px] uppercase tracking-[0.08em] text-[var(--color-accent)]">
             <ArrowsClockwise size={10} />
-            Automatic fallback
+            Fallback used
           </div>
         )}
       </div>
+
+      {request.attemptsRecorded === false && (
+        <p className="border-b border-[var(--color-border)] px-5 py-3 text-[10px] leading-5 text-[var(--color-foreground-secondary)] sm:px-6">
+          Per-attempt results aren&apos;t stored with past requests. This shows the model the router
+          selected and the model that produced the answer
+          {request.fallbackUsed ? "; other fallback attempts may have happened in between" : ""}.
+          Error details are not available here.
+        </p>
+      )}
 
       <div className="p-5 sm:p-6">
         {request.attempts.length > 0 ? (
@@ -159,12 +170,20 @@ export default function RequestExecutionPath({
                             )}
                           </div>
 
-                          {attempt.errorMessage && (
+                          {attempt.errorMessage ? (
                             <p className="mt-2 text-[10px] leading-5 text-[var(--color-foreground-secondary)]">
                               {
                                 attempt.errorMessage
                               }
                             </p>
+                          ) : (
+                            !attempt.errorCode && (
+                              <p className="text-[10px] leading-5 text-[var(--color-foreground-muted)]">
+                                {request.status === "FAILED"
+                                  ? "The request failed. Error details are not stored."
+                                  : "Did not produce the answer. Error details are not stored."}
+                              </p>
+                            )
                           )}
                         </div>
                       )}

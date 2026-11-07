@@ -233,6 +233,43 @@ Reading the log line for a 401:
 
 ---
 
+## 8a. Vercel Dashboard Inspection (2026-11-06, ~19:30 UTC, via the owner's signed-in browser, read-only)
+
+**Firewall: project `attentra`**
+- Custom Rules: **0**. Bot Protection: **Inactive**.
+- System Mitigations: **Active**. **25 requests Challenged** by the **"DDoS Mitigation"** rule. No persistent actions, no denied IPs.
+- **Conclusion:** the 403 `X-Vercel-Mitigated: challenge` comes from Vercel's **automatic DDoS system mitigation**, not from any rule in this project. The other project (`attentra-f635`) also challenges this machine, which suggests the mitigation targets the client IP.
+- Browsers pass the challenge automatically. Scripts cannot.
+
+**Two Vercel projects deploy the same repository** (`hasnain0122E/Attentra`):
+
+| Project | Domain | `DATABASE_URL` |
+|---|---|---|
+| `attentra` | attentra-nine.vercel.app | Production+Preview, **updated Oct 25** |
+| `attentra-f635` | attentra-f635.vercel.app | Production+Preview, **added Sep 3, never updated** |
+
+Both have the same 11 variable names. Values were not viewed. The differing dates make it likely the two projects use **different databases**. Both also run the daily pricing-sync cron.
+
+**Database identity (confirmed):**
+- Key `atr_06d11e...`, created on the **attentra-nine production dashboard** at 19:21:50 UTC, exists in the locally configured DB.
+- So **attentra-nine production and the local `.env` use the same database**, and hypothesis (b) is **ruled out** for attentra-nine.
+
+**Key ownership (confirmed):**
+
+| Key | Status | Owner vs signed-in dashboard account |
+|---|---|---|
+| `atr_06d11e...` "New key test" | active, never used | same account |
+| `atr_651fd4...` | **revoked** | same account |
+| `atr_d51e89...` | revoked | same account |
+| `atr_68c042...` (diagnostic said VALID) | active, never used | **different account** |
+
+**Updated root-cause assessment for the 18:15 UTC 401 on attentra-nine:**
+- The server code is correct and the database matches, so the request carried a token that was not an active key.
+- The only key the dashboard account had at 18:15 besides revoked ones was `atr_651fd4...`, created 17:41 and since revoked. `atr_06d11e...` did not exist until 19:21.
+- **Strongly supported:** the client sent the revoked `atr_651fd4...`, or a malformed value.
+- Other possibility: the request went to `attentra-f635`, whose database likely differs.
+- Final confirmation requires one request reaching the deployed diagnostics, which is blocked from this machine while the mitigation is active.
+
 ## 9. Remaining Issues
 
 1. **Root cause of the 18:15 401 is unconfirmed:** (a) vs (b) needs one post-deploy request or the dashboard check (`atr_68c042...` listed on the production dashboard → (a)).

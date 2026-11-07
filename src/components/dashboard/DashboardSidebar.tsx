@@ -13,6 +13,7 @@ import { useState } from "react";
 
 import {
   ArrowUpRight,
+  BookOpen,
   Buildings,
   ClockCounterClockwise,
   GearSix,
@@ -65,6 +66,11 @@ const accountNavigation = [
     label: "Settings",
     href: "/dashboard/settings",
     icon: GearSix,
+  },
+  {
+    label: "Docs",
+    href: "/docs",
+    icon: BookOpen,
   },
 ];
 

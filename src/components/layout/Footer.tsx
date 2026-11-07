@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "motion/react";
 import {
   ArrowUpRight,
@@ -13,7 +14,9 @@ const productLinks = [
 ];
 
 const developerLinks = [
-  { label: "Quickstart", href: "#developers" },
+  { label: "Documentation", href: "/docs" },
+  { label: "Quickstart", href: "/docs/quickstart" },
+  { label: "API reference", href: "/docs/api/chat-completions" },
   { label: "Pricing preview", href: "#pricing" },
 ];
 
@@ -200,20 +203,30 @@ function FooterColumn({
       </div>
 
       <nav className="mt-5 flex flex-col items-start gap-3.5">
-        {links.map((link) => (
-          <a
-            key={link.label}
-            href={link.href}
-            className="group flex items-center gap-1 text-xs text-[var(--color-foreground-secondary)] transition-colors duration-200 hover:text-[var(--color-foreground)]"
-          >
-            {link.label}
+        {links.map((link) => {
+          const className =
+            "group flex items-center gap-1 text-xs text-[var(--color-foreground-secondary)] transition-colors duration-200 hover:text-[var(--color-foreground)]";
+          const content = (
+            <>
+              {link.label}
 
-            <ArrowUpRight
-              size={10}
-              className="opacity-0 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-50"
-            />
-          </a>
-        ))}
+              <ArrowUpRight
+                size={10}
+                className="opacity-0 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-50"
+              />
+            </>
+          );
+          // Routes use Next.js Link; in-page sections use anchors.
+          return link.href.startsWith("/") ? (
+            <Link key={link.label} href={link.href} className={className}>
+              {content}
+            </Link>
+          ) : (
+            <a key={link.label} href={link.href} className={className}>
+              {content}
+            </a>
+          );
+        })}
       </nav>
     </motion.div>
   );

@@ -50,11 +50,28 @@ export interface RequestHistoryItem {
   outputTokens: number;
   totalTokens: number;
 
+  /**
+   * Where the stored token counts come from:
+   * - "reported":   provider-reported usage (successful execution with a calculated cost)
+   * - "estimated":  routing-time estimate (request failed or never executed)
+   * - "unverified": successful request without a calculated cost — the counts
+   *                 may be provider-reported or the routing estimate
+   * Optional for backward compatibility with older fixtures.
+   */
+  tokenSource?: "reported" | "estimated" | "unverified";
+
   routingLatencyMs: number;
   executionLatencyMs: number;
   latencyMs: number;
 
   attempts: HistoryExecutionAttempt[];
+
+  /**
+   * False when `attempts` is reconstructed from the routed and executed
+   * models only (per-attempt results are not persisted). Intermediate
+   * fallback attempts and their errors are then unknown.
+   */
+  attemptsRecorded?: boolean;
 
   createdAt: string;
 }

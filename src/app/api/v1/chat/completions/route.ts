@@ -35,6 +35,8 @@
  * - Expose credentials or internal details
  */
 
+import { randomBytes } from "crypto";
+
 import { NextRequest, NextResponse } from "next/server";
 
 import { resolveRequester } from "@/lib/auth/resolve-requester";
@@ -114,9 +116,19 @@ function logAuthFailure(fields: {
   );
 }
 
-/** Generate a unique request ID. */
+const REQUEST_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * Generate a server-side request ID (`req_<ms>_<8 base36 chars>`).
+ *
+ * This is the ONLY source of Request primary keys. Client-supplied IDs are
+ * never used for persistence (P0 hotfix: a client ID matching another
+ * caller's request could otherwise reuse and re-own that row).
+ * Uses crypto randomness; a collision fails safely on the primary key.
+ */
 function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const suffix = Array.from(randomBytes(8), (byte) => REQUEST_ID_ALPHABET[byte % 36]).join("");
+  return `req_${Date.now()}_${suffix}`;
 }
 
 /**
@@ -547,7 +559,8 @@ async function handleChatCompletion(request: NextRequest) {
       model,
       taskTypeHint,
       policy,
-      requestId: clientRequestId,
+      // validation.data.requestId (client-supplied) is deliberately ignored:
+      // it is untrusted and must never select or create a persistence row.
     } = validation.data;
 
     // ── 4b. Rate limit — before routing or any provider call ──
@@ -616,7 +629,10 @@ async function handleChatCompletion(request: NextRequest) {
     }
 
     // ── 5. Resolve request ID ─────────────────────────
-    const effectiveRequestId = clientRequestId || requestId;
+    //
+    // Always the server-generated ID. A client `requestId` field is accepted
+    // for backward compatibility but has no effect on persistence identity.
+    const effectiveRequestId = requestId;
 
     // ── 6. Route through existing pipeline ────────────
     const routingResult = await routeAndPersist(
@@ -722,9 +738,16 @@ async function handleChatCompletion(request: NextRequest) {
     }
 
     try {
+      // Conditional attach: only a row that is still UNOWNED (just created
+      // by this request's routing persistence) can receive an owner. A
+      // pre-existing / already-owned row never matches → P2025 → fail
+      // closed below, before any provider call. Atomic; no check-then-write.
       await prisma.request.update({
         where: {
           id: effectiveRequestId,
+          userId: null,
+          businessId: null,
+          apiKeyId: null,
         },
 
         data: ownershipData,

@@ -177,3 +177,19 @@
 - [ ] Demo script
 - [ ] Pitch
 - [ ] Judge Q&A
+
+---
+
+## Phase 3C — Developer Docs & Request Transparency (2026-11-07, uncommitted)
+
+- [x] Public `/docs` portal (20 pages, search, mobile drawer, code tabs/copy)
+- [x] Landing navbar/footer and dashboard sidebar link to `/docs`
+- [x] History list shows latest user message / end of stored user text
+- [x] History detail: conversation context viewer, honest token/cost/fallback telemetry
+- [x] No invented attempt errors; unknown values show "Not available"
+- [x] Tests: docs-portal + history-transparency; full safe suite, tsc, prisma, build pass
+- [ ] Signed-in History screens visually verified
+- [x] P0 hotfix: client-supplied `requestId` ownership issue — server-only IDs, create-only persistence, conditional ownership (`docs/PHASE_3C_REQUEST_ID_SECURITY_HOTFIX.md`)
+- [ ] Persist structured messages for full role-aware context (needs approval)
+
+Report: `docs/PHASE_3C_DEVELOPER_DOCS_AND_REQUEST_TRANSPARENCY.md`

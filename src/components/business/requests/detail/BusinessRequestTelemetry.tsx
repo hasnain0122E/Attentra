@@ -10,6 +10,8 @@ import type { BusinessRequestHistoryItem } from "@/lib/dashboard/business-reques
 
 import { formatDisplayCurrency } from "@/lib/currency/display-currency";
 
+import { describeTokens } from "@/lib/dashboard/request-display";
+
 interface BusinessRequestTelemetryProps {
   request: BusinessRequestHistoryItem;
 }
@@ -67,10 +69,12 @@ export default function BusinessRequestTelemetry({
 
         <TelemetryItem
           label="Total tokens"
-          value={String(
-            request.totalTokens,
-          )}
-          detail={`${request.inputTokens} in · ${request.outputTokens} out`}
+          value={describeTokens(request).total}
+          detail={
+            request.tokenSource === "estimated"
+              ? describeTokens(request).detail
+              : `${request.inputTokens} in · ${request.outputTokens} out`
+          }
           icon={ChartBar}
         />
 
